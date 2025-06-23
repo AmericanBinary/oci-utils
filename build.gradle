@@ -88,6 +88,8 @@ def pathZip = tasks.register('pathZip', Zip) {
 }
 
 tasks.register('pathZipInstall', Copy) {
+    group = 'install'
+    description = 'install via the pathZip'
     dependsOn pathZip
 
     from zipTree(pathZip.get().outputs.files.singleFile)
@@ -116,7 +118,7 @@ def executableJar = tasks.register('executableJar') {
 
 tasks.register('executableJarInstall', Copy) {
     group = 'install'
-    description = ''
+    description = 'install executable jar'
 
     from executableJar
     into new File(new File(System.getProperty("user.home"), '.local'), 'bin')

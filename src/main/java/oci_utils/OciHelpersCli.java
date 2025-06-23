@@ -13,6 +13,7 @@ import org.springframework.util.Assert;
 import picocli.AutoComplete;
 import picocli.CommandLine;
 
+import java.io.File;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.Optional;
@@ -29,6 +30,7 @@ import java.util.concurrent.TimeUnit;
         scope = CommandLine.ScopeType.INHERIT,
         subcommands = {
                 OciHelpersCli.BastionUtils.class,
+                OciHelpersCli.KubectlUtils.class,
                 OciHelpersCli.Utils.class,
                 AutoComplete.GenerateCompletion.class,
         }
@@ -46,7 +48,6 @@ class OciHelpersCli implements Runnable {
     LogbackVerbosityMixin verbosityMixin;
 
     public static void main(String[] args) {
-        // args = new String[]{"u", "co", "l"};
         System.exit(new CommandLine(new OciHelpersCli()).execute(args));
     }
 
@@ -124,7 +125,8 @@ class OciHelpersCli implements Runnable {
         void forwardMysqlPort(
                 @CommandLine.Option(names = {"-c", "--compartment"}, required = true) String compartment,
                 @CommandLine.Option(names = {"-b", "--bastion-name"}) String bastionName,
-                @CommandLine.Option(names = {"-d", "-m", "--database-name", "--mysql-database-name"}) String dbName
+                @CommandLine.Option(names = {"-d", "-m", "--database-name", "--mysql-database-name"}, description = "precedence over --database-id") String dbName,
+                @CommandLine.Option(names = {"-di", "--database-id", "--mysql-database-id"}) String dbId
         ) {
             var c = INSTANCE.getCompartment(compartment);
             BastionListItem bastion = (
@@ -134,8 +136,12 @@ class OciHelpersCli implements Runnable {
             );
             MysqlClusterListItem cluster = (
                     dbName != null
-                            ? INSTANCE.getCompartmentIdMysqlCluster(c.getId(), dbName)
-                            : INSTANCE.getCompartmentIdOnlyMysqlCluster(c.getId())
+                            ? INSTANCE.getCompartmentIdMysqlClusterByName(c.getId(), dbName)
+                            : (
+                                    dbId != null
+                                            ? INSTANCE.getCompartmentIdMysqlClusterById(dbId)
+                                            : INSTANCE.getCompartmentIdOnlyMysqlCluster(c.getId())
+                            )
             );
 
             var host = cluster.getEndpoints().getFirst().getIpAddress();
@@ -162,7 +168,7 @@ class OciHelpersCli implements Runnable {
         private void printSession(SessionItem session, int port, String host) throws JsonProcessingException {
             if (log.isInfoEnabled()) {
                 log.info("session JSON from oci bastion server api is: {}", INSTANCE.mapper.writeValueAsString(session.getSshMetadata()));
-                String s = "ssh -N -L 127.0.0.1:" + port + ":" + host + ":" + port + " -p 22 " + session.getId() + "@host.bastion." + INSTANCE.getOrLoadDefailtProfile().getRegion() + ".oci.oraclecloud.com";
+                String s = "ssh -N -L 127.0.0.1:" + port + ":" + host + ":" + port + " -p 22 " + session.getId() + "@host.bastion." + INSTANCE.getOrLoadDefaultProfile().getRegion() + ".oci.oraclecloud.com";
                 log.info("session ssh command from oci bastion server api is: {}", s);
             }
         }
@@ -174,7 +180,7 @@ class OciHelpersCli implements Runnable {
             for (int i = 0; i < numAttempts; i++) {
                 int attempt = i + 1;
                 long start = System.nanoTime();
-                Process process = new ProcessBuilder(("ssh -N -L 127.0.0.1:" + port + ":" + host + ":" + port + " -p 22 " + session.getId() + "@host.bastion." + INSTANCE.getOrLoadDefailtProfile().getRegion() + ".oci.oraclecloud.com").split(" "))
+                Process process = new ProcessBuilder(("ssh -N -L 127.0.0.1:" + port + ":" + host + ":" + port + " -p 22 " + session.getId() + "@host.bastion." + INSTANCE.getOrLoadDefaultProfile().getRegion() + ".oci.oraclecloud.com").split(" "))
                         .inheritIO()
                         .start();
 
@@ -190,6 +196,33 @@ class OciHelpersCli implements Runnable {
                 }
             }
 
+        }
+    }
+
+    @CommandLine.Command(name = "kubectl-utils", aliases = "ku", description = "kubectl utilities")
+    static class KubectlUtils {
+        @CommandLine.Command(name = "configure-localhost-context", aliases = "clc")
+        @SneakyThrows
+        void configureLocalhostContext(
+                @CommandLine.Option(names = {"-c", "--compartment"}, required = true) String compartment,
+                @CommandLine.Option(names = {"-k", "--cluster-name"}) String clusterName,
+                @CommandLine.Option(names = {"-ki", "--cluster-id"}) String clusterId,
+                @CommandLine.Option(names = {"-f", "--config-file"}, description = "defaults to ${KUBECONFIG:-~/.kube/config}") File file
+        ) {
+            OkeClusterListItem cluster;
+            if (clusterId != null) {
+                cluster = INSTANCE.getCompartmentIdOkeClusterById(clusterId);
+            } else {
+                var c = INSTANCE.getCompartment(compartment);
+                cluster = (
+                        clusterName != null
+                                ? INSTANCE.getCompartmentIdOkeCluster(c.getId(), clusterName)
+                                : INSTANCE.getCompartmentIdOnlyOkeCluster(c.getId())
+                );
+            }
+
+            INSTANCE.configureLocalhostContext(cluster, file);
+            log.info("created context {} (for cluster id '{}')", cluster.getName(), cluster.getId());
         }
     }
 
