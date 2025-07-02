@@ -1,0 +1,123 @@
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.StandardOpenOption
+import java.nio.file.attribute.PosixFilePermissions
+
+plugins {
+    id 'java'
+    id 'jacoco'
+    id 'application'
+    id 'com.gradleup.shadow' version '8.3.6'
+}
+
+group = 'ab-oci-utils'
+version = file('version.txt').text.trim()
+
+// so it can run everywhere else
+java {
+    sourceCompatibility = JavaVersion.toVersion(21)
+    targetCompatibility = JavaVersion.toVersion(21)
+    withSourcesJar()
+}
+
+repositories {
+    mavenCentral()
+}
+
+application.mainClass.set('oci_utils.OciHelpersCli')
+
+jar.manifest.attributes(['Implementation-Version': version])
+
+configurations {
+    // lombok
+    testCompileOnly.extendsFrom(compileOnly)
+    testAnnotationProcessor.extendsFrom(annotationProcessor)
+}
+
+dependencies {
+    annotationProcessor platform('org.springframework.boot:spring-boot-dependencies:3.4.4')
+    implementation platform('org.springframework.boot:spring-boot-dependencies:3.4.4')
+    implementation platform('org.springframework.cloud:spring-cloud-dependencies:2024.0.0')
+
+    annotationProcessor 'org.projectlombok:lombok'
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+    implementation 'info.picocli:picocli:4.7.7'
+    annotationProcessor 'info.picocli:picocli-codegen:4.7.7'
+
+    implementation 'org.springframework.boot:spring-boot-starter-logging'
+    implementation 'org.springframework.boot:spring-boot-starter-json'
+    // https://mvnrepository.com/artifact/org.ini4j/ini4j
+    implementation 'org.ini4j:ini4j:0.5.4'
+    // https://mvnrepository.com/artifact/io.github.resilience4j/resilience4j-retry
+    implementation 'io.github.resilience4j:resilience4j-retry:2.3.0'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.hamcrest:hamcrest'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+def projectName = project.name
+
+def pathZipLauncher = tasks.register('pathZipLauncher') {
+    dependsOn 'shadowJar'
+
+    def scriptFile = layout.buildDirectory.file('tmp/pathZipLauncher').get().asFile
+    outputs.file(scriptFile)
+    doLast {
+        scriptFile.text = """
+            #!/usr/bin/env bash
+            java -jar "\$(dirname "\$0")/${tasks.shadowJar.outputs.files.singleFile.toPath().fileName}" "\$@"
+        """.stripIndent()
+        scriptFile.setExecutable(true)
+    }
+}
+
+def pathZip = tasks.register('pathZip', Zip) {
+    group = 'build'
+    description = 'build a zip for unzipping in a PATH dir'
+
+    archiveBaseName = projectName + '-pathZip'
+    from tasks.shadowJar
+    from(pathZipLauncher) {
+        filePermissions {
+            unix 0755
+        }
+        rename { projectName }
+    }
+}
+
+tasks.register('pathZipInstall', Copy) {
+    dependsOn pathZip
+
+    from zipTree(pathZip.get().outputs.files.singleFile)
+    into new File(new File(System.getProperty("user.home"), '.local'), 'bin')
+}
+
+def executableJar = tasks.register('executableJar') {
+    group = 'build'
+    description = 'build an executable jar that you can place in your PATH'
+    dependsOn 'shadowJar'
+
+    def inputFile = tasks.named('shadowJar').get().outputs.files.singleFile.toPath()
+    inputs.file inputFile
+
+    def outputFile = Path.of(String.valueOf(inputFile).replace("-all.jar", "-executable.jar"))
+    outputs.file outputFile
+
+    doLast {
+        try (var os = Files.newOutputStream(outputFile, StandardOpenOption.CREATE)) {
+            os.write('#!/usr/bin/env -S java -jar\n'.getBytes())
+            os.write(Files.readAllBytes(inputFile))
+            Files.setPosixFilePermissions(outputFile, PosixFilePermissions.fromString("rwxr-xr-x"))
+        }
+    }
+}
+
+tasks.register('executableJarInstall', Copy) {
+    group = 'install'
+    description = ''
+
+    from executableJar
+    into new File(new File(System.getProperty("user.home"), '.local'), 'bin')
+}
