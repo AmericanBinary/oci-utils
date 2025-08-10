@@ -122,4 +122,5 @@ tasks.register('executableJarInstall', Copy) {
 
     from executableJar
     into new File(new File(System.getProperty("user.home"), '.local'), 'bin')
+    rename '.*', 'oci-utils'
 }
