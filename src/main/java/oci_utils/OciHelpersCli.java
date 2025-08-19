@@ -23,6 +23,7 @@ import java.util.List;
         mixinStandardHelpOptions = true,
         sortOptions = false,
         scope = CommandLine.ScopeType.INHERIT,
+        showDefaultValues = true,
         subcommands = {
                 OciHelpersCli.BastionUtils.class,
                 OciHelpersCli.KubectlUtils.class,
@@ -30,20 +31,16 @@ import java.util.List;
                 AutoComplete.GenerateCompletion.class,
         }
 )
-class OciHelpersCli implements Runnable {
+class OciHelpersCli {
     static final OciHelpers INSTANCE = new OciHelpers();
     static final String HOME_SSH_ID_RSA_PUB = Paths.get(System.getProperty("user.home"), ".ssh", "id_rsa.pub").toString();
 
+    @SuppressWarnings("unused")
     @CommandLine.Mixin
     LogbackVerbosityMixin verbosityMixin;
 
     public static void main(String[] args) {
         System.exit(new CommandLine(new OciHelpersCli()).execute(args));
-    }
-
-    @Override
-    public void run() {
-        log.info("Verbosity mixin: {}", verbosityMixin);
     }
 
     @CommandLine.Command(name = "util", aliases = "u", description = "general utilities", subcommands = {
@@ -83,9 +80,12 @@ class OciHelpersCli implements Runnable {
         @CommandLine.Command(name = "forward-kubectl")
         @SneakyThrows
         void forwardKubectlPort(
-                @CommandLine.Option(names = {"-c", "--compartment"}, required = true) String compartment,
-                @CommandLine.Option(names = {"-b", "--bastion-name"}) String bastionName,
-                @CommandLine.Option(names = {"-k", "--cluster-name"}) String clusterName
+                @CommandLine.Option(names = {"-c", "--compartment"}, required = true, description = "compartment name")
+                String compartment,
+                @CommandLine.Option(names = {"-b", "--bastion-name"}, description = "defaults to sole bastion in compartment")
+                String bastionName,
+                @CommandLine.Option(names = {"-k", "--cluster-name"}, description = "defaults to sole cluster in compartment")
+                String clusterName
         ) {
             var c = INSTANCE.getCompartment(compartment);
             BastionListItem bastion = (
@@ -119,10 +119,15 @@ class OciHelpersCli implements Runnable {
         @CommandLine.Command(name = "forward-mysql")
         @SneakyThrows
         void forwardMysqlPort(
-                @CommandLine.Option(names = {"-c", "--compartment"}, required = true) String compartment,
-                @CommandLine.Option(names = {"-b", "--bastion-name"}) String bastionName,
-                @CommandLine.Option(names = {"-d", "-m", "--database-name", "--mysql-database-name"}, description = "precedence over --database-id") String dbName,
-                @CommandLine.Option(names = {"-di", "--database-id", "--mysql-database-id"}) String dbId
+                @CommandLine.Option(names = {"-c", "--compartment"}, required = true, description = "compartment name")
+                String compartment,
+                @CommandLine.Option(names = {"-b", "--bastion-name"}, description = "defaults to sole bastion in compartment")
+                String bastionName,
+                @CommandLine.Option(names = {"-d", "-m", "--database-name", "--mysql-database-name"},
+                        description = "precedence over --database-id, defaults to sole cluster in compartment")
+                String dbName,
+                @CommandLine.Option(names = {"-di", "--database-id", "--mysql-database-id"})
+                String dbId
         ) {
             var c = INSTANCE.getCompartment(compartment);
             BastionListItem bastion = (
@@ -168,13 +173,13 @@ class OciHelpersCli implements Runnable {
 
     @CommandLine.Command(name = "kubectl-utils", aliases = "ku", description = "kubectl utilities")
     static class KubectlUtils {
-        @CommandLine.Command(name = "configure-localhost-context", aliases = "clc")
+        @CommandLine.Command(name = "configure-localhost-context", aliases = "clc", description = "creates a kubectl context corresponding to an OKE cluster")
         @SneakyThrows
         void configureLocalhostContext(
-                @CommandLine.Option(names = {"-c", "--compartment"}, required = true) String compartment,
-                @CommandLine.Option(names = {"-k", "--cluster-name"}) String clusterName,
+                @CommandLine.Option(names = {"-c", "--compartment"}, required = true, description = "compartment name") String compartment,
+                @CommandLine.Option(names = {"-k", "--cluster-name"}, description = "precedence over --cluster-id, defaults to sole cluster in compartment") String clusterName,
                 @CommandLine.Option(names = {"-ki", "--cluster-id"}) String clusterId,
-                @CommandLine.Option(names = {"-f", "--config-file"}, description = "defaults to ${KUBECONFIG:-~/.kube/config}") File file
+                @CommandLine.Option(names = {"-f", "--config-file"}, description = "defaults to $${KUBECONFIG:-~/.kube/config}") File file
         ) {
             OkeClusterListItem cluster;
             if (clusterId != null) {

@@ -1,17 +1,19 @@
-# Welcome to MkDocs
+# Welcome to `oci-utils` (by American Binary)
 
-For full documentation visit [mkdocs.org](https://www.mkdocs.org).
+A tool for speeding up software development on [Oracle Cloud](https://cloud.oracle.com)
 
 ## Commands
 
-* `mkdocs new [dir-name]` - Create a new project.
-* `mkdocs serve` - Start the live-reloading docs server.
-* `mkdocs build` - Build the documentation site.
-* `mkdocs -h` - Print help message and exit.
+Overview of available functionality:
 
-## Project layout
+* `oci-utils --version`
+* `oci-utils util compartments`
+* `oci-utils util config`
+* `oci-utils bastion-utils forward-kubectl`
+* `oci-utils bastion-utils forward-mysql`
+* `oci-utils kubectl configure-localhost-context`
 
-    mkdocs.yml    # The configuration file.
-    docs/
-        index.md  # The documentation homepage.
-        ...       # Other markdown pages, images and other files.
+`oci-utils` can also be used in combination with `oci`:
+
+* `oci compute instance list -c $(oci-utils util config print | jq .DEFAULT.tenancy -r)` - list instances in root compartment
+* `oci compute instance list -c $(oci-utils util compartments get --name specific | jq .id -r)` - list instances in specific compartment

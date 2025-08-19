@@ -58,6 +58,10 @@ dependencies {
 }
 
 def projectName = project.name
+def directoryInPath = new File(
+        System.getenv('INSTALL_DIRECTORY') ?:
+                new File(new File(System.getProperty('user.home'), '.local'), 'bin').getPath()
+)
 
 def pathZipLauncher = tasks.register('pathZipLauncher') {
     dependsOn 'shadowJar'
@@ -93,7 +97,7 @@ tasks.register('pathZipInstall', Copy) {
     dependsOn pathZip
 
     from zipTree(pathZip.get().outputs.files.singleFile)
-    into new File(new File(System.getProperty("user.home"), '.local'), 'bin')
+    into directoryInPath
 }
 
 def executableJar = tasks.register('executableJar') {
@@ -121,6 +125,6 @@ tasks.register('executableJarInstall', Copy) {
     description = 'install executable jar'
 
     from executableJar
-    into new File(new File(System.getProperty("user.home"), '.local'), 'bin')
+    into directoryInPath
     rename '.*', 'oci-utils'
 }
