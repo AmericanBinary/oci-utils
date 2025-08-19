@@ -13,6 +13,7 @@ import picocli.CommandLine;
 
 import java.io.File;
 import java.nio.file.Paths;
+import java.util.List;
 
 @Slf4j
 @CommandLine.Command(
@@ -100,12 +101,19 @@ class OciHelpersCli implements Runnable {
 
             String privateEndpoint = cluster.getEndpoints().getPrivateEndpoint();
             Assert.notNull(privateEndpoint, "Must have private endpoint on cluster to forward to private endpoint");
+            var pf = generateForwardForEndpoint(privateEndpoint);
+
+            var session = INSTANCE.getAndWaitForSession(bastion, HOME_SSH_ID_RSA_PUB, pf);
+            printSession(session, pf);
+            var sessionProcess = INSTANCE.startSession(session, pf);
+            printSessionProcess(pf);
+            sessionProcess.waitFor();
+        }
+
+        OciHelpers.LocalPortForward generateForwardForEndpoint(String privateEndpoint) {
             var host = privateEndpoint.split(":")[0];
             var port = Integer.parseInt(privateEndpoint.split(":")[1]);
-
-            var session = INSTANCE.getAndWaitForSession(bastion, HOME_SSH_ID_RSA_PUB, host, port);
-            printSession(session, port, host);
-            INSTANCE.startSession(session, host, port).waitFor();
+            return new OciHelpers.LocalPortForward(port, host, port);
         }
 
         @CommandLine.Command(name = "forward-mysql")
@@ -126,26 +134,35 @@ class OciHelpersCli implements Runnable {
                     dbName != null
                             ? INSTANCE.getCompartmentIdMysqlClusterByName(c.getId(), dbName)
                             : (
-                                    dbId != null
-                                            ? INSTANCE.getCompartmentIdMysqlClusterById(dbId)
-                                            : INSTANCE.getCompartmentIdOnlyMysqlCluster(c.getId())
-                            )
+                            dbId != null
+                                    ? INSTANCE.getCompartmentIdMysqlClusterById(dbId)
+                                    : INSTANCE.getCompartmentIdOnlyMysqlCluster(c.getId())
+                    )
             );
 
-            var host = cluster.getEndpoints().getFirst().getIpAddress();
-            var port = cluster.getEndpoints().getFirst().getPort();
+            var pf = new OciHelpers.LocalPortForward(
+                    cluster.getEndpoints().getFirst().getPort(),
+                    cluster.getEndpoints().getFirst().getIpAddress(),
+                    cluster.getEndpoints().getFirst().getPort()
+            );
 
-            var session = INSTANCE.getAndWaitForSession(bastion, HOME_SSH_ID_RSA_PUB, host, port);
-            printSession(session, port, host);
-            INSTANCE.startSession(session, host, port).waitFor();
+            var session = INSTANCE.getAndWaitForSession(bastion, HOME_SSH_ID_RSA_PUB, pf);
+            printSession(session, pf);
+            var sessionProcess = INSTANCE.startSession(session, pf);
+            printSessionProcess(pf);
+            sessionProcess.waitFor();
         }
 
-        private void printSession(SessionItem session, int port, String host) throws JsonProcessingException {
+        private void printSession(SessionItem session, OciHelpers.LocalPortForward forward) throws JsonProcessingException {
             if (log.isInfoEnabled()) {
                 log.info("session JSON from oci bastion server api is: {}", INSTANCE.mapper.writeValueAsString(session.getSshMetadata()));
-                String s = "ssh -N -L 127.0.0.1:" + port + ":" + host + ":" + port + " -p 22 " + session.getId() + "@host.bastion." + INSTANCE.getOrLoadDefaultProfile().getRegion() + ".oci.oraclecloud.com";
+                String s = "ssh -N -L 127.0.0.1:" + forward.localPort() + ":" + forward.remoteHost() + ":" + forward.remotePort() + " -p 22 " + session.getId() + "@host.bastion." + INSTANCE.getOrLoadDefaultProfile().getRegion() + ".oci.oraclecloud.com";
                 log.info("session ssh command from oci bastion server api is: {}", s);
             }
+        }
+
+        private void printSessionProcess(OciHelpers.LocalPortForward pf) {
+            System.err.println("Forwarding local connections to localhost on port " + pf.localPort() + " to remote host " + pf.remoteHost() + " on port " + pf.remotePort());
         }
     }
 
