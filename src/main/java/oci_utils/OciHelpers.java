@@ -193,6 +193,7 @@ public class OciHelpers {
                 " --region " + getOrLoadDefaultProfile().getRegion() +
                 " --token-version 2.0.0 --kube-endpoint PRIVATE_ENDPOINT");
 
+        // todo manually activate and rename maybe
         var old = run("kubectl config current-context").output().trim();
 
         boolean alreadyHaveContext = listFromIterator(mapper.readTree(run("kubectl config view -o json").output()).get("contexts").elements())
