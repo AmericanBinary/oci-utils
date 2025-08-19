@@ -1,8 +1,6 @@
 package oci_utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import io.github.resilience4j.retry.Retry;
-import io.github.resilience4j.retry.RetryConfig;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import oci_utils.model.BastionListItem;
@@ -15,10 +13,6 @@ import picocli.CommandLine;
 
 import java.io.File;
 import java.nio.file.Paths;
-import java.time.Duration;
-import java.util.Optional;
-import java.util.concurrent.Callable;
-import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @CommandLine.Command(
@@ -37,11 +31,6 @@ import java.util.concurrent.TimeUnit;
 )
 class OciHelpersCli implements Runnable {
     static final OciHelpers INSTANCE = new OciHelpers();
-    static final RetryConfig RETRY_CONFIG = RetryConfig.custom()
-            .maxAttempts(10)
-            .waitDuration(Duration.ofSeconds(1))
-            .retryOnException(ignored -> true)
-            .build();
     static final String HOME_SSH_ID_RSA_PUB = Paths.get(System.getProperty("user.home"), ".ssh", "id_rsa.pub").toString();
 
     @CommandLine.Mixin
@@ -114,10 +103,9 @@ class OciHelpersCli implements Runnable {
             var host = privateEndpoint.split(":")[0];
             var port = Integer.parseInt(privateEndpoint.split(":")[1]);
 
-            var session = getAndWaitForSession(bastion, host, port);
-
+            var session = INSTANCE.getAndWaitForSession(bastion, HOME_SSH_ID_RSA_PUB, host, port);
             printSession(session, port, host);
-            startSession(session, port, host);
+            INSTANCE.startSession(session, host, port).waitFor();
         }
 
         @CommandLine.Command(name = "forward-mysql")
@@ -147,22 +135,9 @@ class OciHelpersCli implements Runnable {
             var host = cluster.getEndpoints().getFirst().getIpAddress();
             var port = cluster.getEndpoints().getFirst().getPort();
 
-            var session = getAndWaitForSession(bastion, host, port);
+            var session = INSTANCE.getAndWaitForSession(bastion, HOME_SSH_ID_RSA_PUB, host, port);
             printSession(session, port, host);
-            startSession(session, port, host);
-        }
-
-        private SessionItem getAndWaitForSession(BastionListItem bastion, String host, int port) throws Exception {
-            var session = INSTANCE.createPortForwardingSession(bastion.getId(), HOME_SSH_ID_RSA_PUB, host, port);
-
-            if (session.getSshMetadata() == null) {
-                log.debug("ssh metadata is being retried for session {} (bastion {} on host {}/port {})", session.getId(), bastion.getName(), host, port);
-                Callable<SessionItem.SshMetadata> sshMetadataSupplier = Retry.of("sshMetadata", RETRY_CONFIG)
-                        .decorateCallable(() -> Optional.of(INSTANCE.getSession(session.getId())).map(SessionItem::getSshMetadata).orElseThrow());
-                SessionItem.SshMetadata sessionSsh = sshMetadataSupplier.call();
-                session.setSshMetadata(sessionSsh);
-            }
-            return session;
+            INSTANCE.startSession(session, host, port).waitFor();
         }
 
         private void printSession(SessionItem session, int port, String host) throws JsonProcessingException {
@@ -171,31 +146,6 @@ class OciHelpersCli implements Runnable {
                 String s = "ssh -N -L 127.0.0.1:" + port + ":" + host + ":" + port + " -p 22 " + session.getId() + "@host.bastion." + INSTANCE.getOrLoadDefaultProfile().getRegion() + ".oci.oraclecloud.com";
                 log.info("session ssh command from oci bastion server api is: {}", s);
             }
-        }
-
-        @SneakyThrows
-        private void startSession(SessionItem session, int port, String host) {
-            // todo figure out retry logic with resilience4j
-            int numAttempts = 10;
-            for (int i = 0; i < numAttempts; i++) {
-                int attempt = i + 1;
-                long start = System.nanoTime();
-                Process process = new ProcessBuilder(("ssh -N -L 127.0.0.1:" + port + ":" + host + ":" + port + " -p 22 " + session.getId() + "@host.bastion." + INSTANCE.getOrLoadDefaultProfile().getRegion() + ".oci.oraclecloud.com").split(" "))
-                        .inheritIO()
-                        .start();
-
-                boolean exited = process.waitFor(10, TimeUnit.SECONDS);
-                if (exited) {
-                    Duration duration = Duration.ofNanos(System.nanoTime() - start);
-                    log.info("attempt {} failed, ssh process lasted {} which is less than 10 seconds, we should probably try again", attempt, duration);
-                } else {
-                    log.info("ssh process lasted {} and still alive so this is successful", Duration.ofNanos(System.nanoTime() - start));
-                    // if it hasn't already exited, wait for it
-                    process.waitFor();
-                    break;
-                }
-            }
-
         }
     }
 

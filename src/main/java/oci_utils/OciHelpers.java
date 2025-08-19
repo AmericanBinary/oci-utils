@@ -3,22 +3,33 @@ package oci_utils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.resilience4j.retry.Retry;
+import io.github.resilience4j.retry.RetryConfig;
 import lombok.*;
 import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
-import org.ini4j.Ini;
 import oci_utils.model.*;
+import org.ini4j.Ini;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 
 @Data
 @Slf4j
 public class OciHelpers {
+    static final RetryConfig RETRY_CONFIG = RetryConfig.custom()
+            .maxAttempts(10)
+            .waitDuration(Duration.ofSeconds(1))
+            .retryOnException(ignored -> true)
+            .build();
     @Setter(AccessLevel.NONE)
     ObjectMapper mapper = new ObjectMapper().findAndRegisterModules();
     @Setter(AccessLevel.NONE)
@@ -122,7 +133,8 @@ public class OciHelpers {
     @SneakyThrows
     public OkeClusterListItem getCompartmentIdOkeClusterById(String clusterId) {
         var result = run("oci ce cluster get --cluster-id " + clusterId);
-        var item = mapper.readValue(result.output(), new TypeReference<BaseOciDataItem<OkeClusterListItem>>() {});
+        var item = mapper.readValue(result.output(), new TypeReference<BaseOciDataItem<OkeClusterListItem>>() {
+        });
         return item.getData();
     }
 
@@ -133,6 +145,46 @@ public class OciHelpers {
         var session = mapper.readValue(result.output(), new TypeReference<BaseOciDataItem<SessionItem>>() {
         });
         return session.getData();
+    }
+
+    @SneakyThrows
+    public SessionItem getAndWaitForSession(BastionListItem bastion, String keyFile, String host, int port) {
+        return waitForPortForwardingSession(bastion, host, port, createPortForwardingSession(bastion.getId(), keyFile, host, port));
+    }
+
+    @SneakyThrows
+    public SessionItem waitForPortForwardingSession(BastionListItem bastion, String host, int port, SessionItem session) {
+        if (session.getSshMetadata() == null) {
+            log.debug("ssh metadata is being retried for session {} (bastion {} on host {}/port {})", session.getId(), bastion.getName(), host, port);
+            Callable<SessionItem.SshMetadata> sshMetadataSupplier = Retry.of("sshMetadata", RETRY_CONFIG)
+                    .decorateCallable(() -> Optional.of(getSession(session.getId())).map(SessionItem::getSshMetadata).orElseThrow());
+            SessionItem.SshMetadata sessionSsh = sshMetadataSupplier.call();
+            session.setSshMetadata(sessionSsh);
+        }
+        return session;
+    }
+
+    @SneakyThrows
+    public Process startSession(SessionItem session, String host, int port) {
+        return Retry.of("startSession", RETRY_CONFIG)
+                .executeCallable(() -> {
+                    long start = System.nanoTime();
+                    Process process = new ProcessBuilder(("ssh -N -L 127.0.0.1:" + port + ":" + host + ":" + port + " -p 22 " + session.getId() + "@host.bastion." + getOrLoadDefaultProfile().getRegion() + ".oci.oraclecloud.com").split(" "))
+                            .inheritIO()
+                            .start();
+
+                    boolean exited = process.waitFor(10, TimeUnit.SECONDS);
+                    if (exited) {
+                        Duration duration = Duration.ofNanos(System.nanoTime() - start);
+                        log.debug("attempt failed, ssh process lasted {} which is less than 10 seconds, we should probably try again", duration);
+                        throw new RuntimeException("ssh process died too fast");
+                    } else {
+                        log.info("ssh process lasted {} and still alive so this is successful", Duration.ofNanos(System.nanoTime() - start));
+                        // if it hasn't already exited, wait for it
+                        process.waitFor();
+                    }
+                    return process;
+                });
     }
 
     @SneakyThrows
@@ -159,7 +211,8 @@ public class OciHelpers {
     @SneakyThrows
     public MysqlClusterListItem getCompartmentIdMysqlClusterById(String id) {
         var result = run("oci mysql db-system get --db-system-id " + id);
-        var item = mapper.readValue(result.output(), new TypeReference<BaseOciDataItem<MysqlClusterListItem>>() {});
+        var item = mapper.readValue(result.output(), new TypeReference<BaseOciDataItem<MysqlClusterListItem>>() {
+        });
         return item.getData();
     }
 
