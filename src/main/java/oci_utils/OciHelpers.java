@@ -3,22 +3,34 @@ package oci_utils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.resilience4j.retry.Retry;
+import io.github.resilience4j.retry.RetryConfig;
+import io.github.resilience4j.retry.RetryRegistry;
 import lombok.*;
 import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
-import org.ini4j.Ini;
 import oci_utils.model.*;
+import org.ini4j.Ini;
 
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.Callable;
+import java.util.concurrent.TimeUnit;
 
 @Data
 @Slf4j
 public class OciHelpers {
+    static final RetryRegistry RETRY_CONFIG = RetryRegistry.of(RetryConfig.custom()
+            .maxAttempts(10)
+            .waitDuration(Duration.ofSeconds(1))
+            .retryOnException(ignored -> true)
+            .build());
     @Setter(AccessLevel.NONE)
     ObjectMapper mapper = new ObjectMapper().findAndRegisterModules();
     @Setter(AccessLevel.NONE)
@@ -122,17 +134,62 @@ public class OciHelpers {
     @SneakyThrows
     public OkeClusterListItem getCompartmentIdOkeClusterById(String clusterId) {
         var result = run("oci ce cluster get --cluster-id " + clusterId);
-        var item = mapper.readValue(result.output(), new TypeReference<BaseOciDataItem<OkeClusterListItem>>() {});
+        var item = mapper.readValue(result.output(), new TypeReference<BaseOciDataItem<OkeClusterListItem>>() {
+        });
         return item.getData();
     }
 
     @SneakyThrows
-    public SessionItem createPortForwardingSession(String bastionId, String sshPublicKeyFile, String host, int port) {
+    public SessionItem createPortForwardingSession(String bastionId, String sshPublicKeyFile, LocalPortForward forward) {
         // oci bastion session create-port-forwarding --bastion-id ${bastion_id} --ssh-public-key-file ${ssh_public_key} --target-private-ip ${private_endpoint_host} --target-port ${private_endpoint_port} | tee /dev/stderr | jq -r .data.id
-        var result = run("oci bastion session create-port-forwarding --bastion-id " + bastionId + " --ssh-public-key-file " + sshPublicKeyFile + " --target-private-ip " + host + " --target-port " + port);
+        var result = run("oci bastion session create-port-forwarding --bastion-id " + bastionId + " --ssh-public-key-file " + sshPublicKeyFile + " --target-private-ip " + forward.remoteHost() + " --target-port " + forward.remotePort());
         var session = mapper.readValue(result.output(), new TypeReference<BaseOciDataItem<SessionItem>>() {
         });
         return session.getData();
+    }
+
+    @SneakyThrows
+    public SessionItem getAndWaitForSession(BastionListItem bastion, String keyFile, LocalPortForward portForward) {
+        return waitForPortForwardingSession(bastion, portForward, createPortForwardingSession(bastion.getId(), keyFile, portForward));
+    }
+
+    @SneakyThrows
+    public SessionItem waitForPortForwardingSession(BastionListItem bastion, LocalPortForward forward, SessionItem session) {
+        if (session.getSshMetadata() == null) {
+            log.debug("ssh metadata is being retried for session {} (bastion {} for forward: {})", session.getId(), bastion.getName(), forward);
+            SessionItem.SshMetadata sessionSsh = RETRY_CONFIG.retry("sshMetadata")
+                    .executeCallable(() -> Optional.of(getSession(session.getId())).map(SessionItem::getSshMetadata).orElseThrow());
+            session.setSshMetadata(sessionSsh);
+        }
+        return session;
+    }
+
+    @SneakyThrows
+    public Process startSession(SessionItem session, LocalPortForward portForward) {
+        return RETRY_CONFIG.retry("startSession")
+                .executeCallable(() -> {
+                    long start = System.nanoTime();
+                    var pb = new ProcessBuilder(("ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -N -L 127.0.0.1:" + portForward.localPort() + ":" + portForward.remoteHost() + ":" + portForward.remotePort() + " -p 22 " + session.getId() + "@host.bastion." + getOrLoadDefaultProfile().getRegion() + ".oci.oraclecloud.com").split(" "));
+
+                    if (log.isInfoEnabled())
+                        pb.inheritIO();
+                    else
+                        pb.redirectOutput(ProcessBuilder.Redirect.PIPE)
+                                .redirectError(ProcessBuilder.Redirect.PIPE);
+
+                    Process process = pb
+                            .start();
+
+                    boolean exited = process.waitFor(10, TimeUnit.SECONDS);
+                    if (exited) {
+                        Duration duration = Duration.ofNanos(System.nanoTime() - start);
+                        log.debug("attempt failed, ssh process lasted {} which is less than 10 seconds, we should probably try again", duration);
+                        throw new RuntimeException("ssh process died too fast - try running with -vv for increased verbosity");
+                    } else {
+                        log.info("ssh process lasted {} and still alive so this is successful", Duration.ofNanos(System.nanoTime() - start));
+                    }
+                    return process;
+                });
     }
 
     @SneakyThrows
@@ -159,7 +216,8 @@ public class OciHelpers {
     @SneakyThrows
     public MysqlClusterListItem getCompartmentIdMysqlClusterById(String id) {
         var result = run("oci mysql db-system get --db-system-id " + id);
-        var item = mapper.readValue(result.output(), new TypeReference<BaseOciDataItem<MysqlClusterListItem>>() {});
+        var item = mapper.readValue(result.output(), new TypeReference<BaseOciDataItem<MysqlClusterListItem>>() {
+        });
         return item.getData();
     }
 
@@ -239,6 +297,8 @@ public class OciHelpers {
         return runResult;
     }
 
+    public record LocalPortForward(int localPort, String remoteHost, int remotePort) {
+    }
 
     record RunResult(String output, String error, int code) {
     }
