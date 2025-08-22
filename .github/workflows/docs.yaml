@@ -9,16 +9,14 @@ on:
   push:
     branches:
       - master
-    paths:
+    paths: &paths
       - src/docs
       - .github/workflows/docs.yaml
   pull_request:
     branches:
       - master
     types: [opened, synchronize]
-    paths:
-      - src/docs
-      - .github/workflows/docs.yaml
+    paths: *paths
 
 jobs:
   docs:
@@ -35,11 +33,20 @@ jobs:
           poetry install
           poetry run mkdocs build
 
+      # upload
+      - uses: actions/upload-artifact@v4
+        with: &mkdocs_site_artifact
+          name: mkdocs-site
+          path: src/docs/build
+
   pages:
     needs: [ docs ]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master' # when merged
     runs-on: ubuntu-latest
     steps:
+      # download
+      - { uses: actions/download-artifact@v4, with: *mkdocs_site_artifact }
+
       # github pages
       - { uses: actions/configure-pages@v5 }
       - { uses: actions/upload-pages-artifact@v3, with: { path: 'src/docs/build' } }
