@@ -1,7 +1,5 @@
 # Welcome to `oci-utils` (by American Binary)
 
-this is a test
-
 A tool for speeding up software development on [Oracle Cloud](https://cloud.oracle.com)
 
 ## Commands
