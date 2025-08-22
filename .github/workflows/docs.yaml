@@ -1,0 +1,28 @@
+name: docs
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - src/docs
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      # build site
+      - { uses: actions/checkout@v4 }
+      - { uses: actions/setup-python@v5, with: { python-version: '3.12' } }
+      - { uses: snok/install-poetry@v1, with: { version: '2.1.4' } }
+      - shell: bash
+        run: |
+          set -eux -o pipefail
+          cd src/docs
+          poetry install
+          poetry run mkdocs build
+
+      # github pages
+      - { uses: actions/configure-pages@v5 }
+      - { uses: actions/upload-pages-artifact@v3, with: { path: 'src/docs/build' } }
+      - { uses: actions/deploy-pages@v4 }
