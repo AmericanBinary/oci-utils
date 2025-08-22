@@ -77,7 +77,7 @@ Here is how to find each piece of information:
 
 ## Configuring
 
-Currently, besides configuration parameters, here are the available settings for `oci-utils`:
+Currently, besides command line flags, here are the available settings for `oci-utils`:
 
 | setting                     | env var               | cli flag                  |
 |-----------------------------|-----------------------|---------------------------|
