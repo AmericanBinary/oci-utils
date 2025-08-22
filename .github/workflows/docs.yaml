@@ -8,7 +8,7 @@ permissions:
 on:
   pull_request:
     branches:
-      - main
+      - master
     types: [opened, synchronize, closed]
     paths:
       - src/docs
@@ -31,7 +31,7 @@ jobs:
 
   pages:
     needs: [ docs ]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' # when merged
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master' # when merged
     runs-on: ubuntu-latest
     steps:
       # github pages
