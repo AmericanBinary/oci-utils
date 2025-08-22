@@ -6,10 +6,16 @@ permissions:
   pages: write
 
 on:
+  push:
+    branches:
+      - master
+    paths:
+      - src/docs
+      - .github/workflows/docs.yaml
   pull_request:
     branches:
       - master
-    types: [opened, synchronize, closed]
+    types: [opened, synchronize]
     paths:
       - src/docs
       - .github/workflows/docs.yaml
