@@ -38,6 +38,7 @@ jobs:
         with: &mkdocs_site_artifact
           name: mkdocs-site
           path: src/docs/build
+          retention-days: 1
 
   pages:
     needs: [ docs ]
