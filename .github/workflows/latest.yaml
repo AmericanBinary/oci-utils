@@ -17,6 +17,7 @@ on:
 
 jobs:
   build:
+    if: github.event_name != 'push' || github.ref != 'refs/heads/master' # when synchronize
     runs-on: ubuntu-latest
     steps:
       # build site
@@ -56,4 +57,4 @@ jobs:
           name: Release v${{ env.VERSION }}
           # body: Initial release of the project.
           files: |
-            build/libs/oci-utils-latest-all.jar
+            build/libs/oci-utils-latest-all.jar/oci-utils-latest-all.jar
