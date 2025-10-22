@@ -22,4 +22,3 @@
 ## `0.0.4` - `2025-10-22T11:42:36-04:00`
 
 * finish fixing latest upload
-* attempt to optimize away redundant builds

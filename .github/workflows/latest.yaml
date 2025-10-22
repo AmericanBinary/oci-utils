@@ -18,7 +18,6 @@ on:
 
 jobs:
   build:
-    if: github.event_name != 'push' || github.ref != 'refs/heads/master' # when synchronize
     runs-on: ubuntu-latest
     steps:
       # build site
@@ -34,6 +33,7 @@ jobs:
           retention-days: 1
 
   publish:
+    needs: [ build ]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master' # when merged
     runs-on: ubuntu-latest
     steps:
