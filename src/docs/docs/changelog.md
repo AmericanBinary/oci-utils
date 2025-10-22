@@ -14,3 +14,7 @@
 * add unit test for reusable "one" function (inspired by [tf's "one"][tf-one])
 
 [tf-one]: https://developer.hashicorp.com/terraform/language/functions/one
+
+## `0.0.3` - `2025-10-22T11:37:16-04:00`
+
+* fix latest upload
