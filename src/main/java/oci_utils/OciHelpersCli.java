@@ -13,7 +13,6 @@ import picocli.CommandLine;
 
 import java.io.File;
 import java.nio.file.Paths;
-import java.util.List;
 
 @Slf4j
 @CommandLine.Command(
@@ -46,6 +45,9 @@ class OciHelpersCli {
     @CommandLine.Command(name = "util", aliases = "u", description = "general utilities", subcommands = {
             Utils.Compartments.class,
             Utils.Config.class,
+            Utils.Mysql.class,
+            Utils.Bastion.class,
+            Utils.OkeCluster.class,
     })
     static class Utils {
         @CommandLine.Command(name = "compartments", aliases = {"co", "comp"})
@@ -73,6 +75,69 @@ class OciHelpersCli {
                 System.out.println(INSTANCE.mapper.writeValueAsString(config));
             }
         }
+
+        @CommandLine.Command(name = "mysql", description = "mysql instances")
+        static class Mysql {
+            @SneakyThrows
+            @CommandLine.Command(name = "list", aliases = "l", description = "list mysql instances in tenancy")
+            void list(@CommandLine.Option(names = {"-c", "--compartment"}, required = true, description = "compartment name") String compartment) {
+                String compartmentId = INSTANCE.getCompartment(compartment).getId();
+                System.out.println(INSTANCE.mapper.writeValueAsString(INSTANCE.listMysqlInCompartment(compartmentId)));
+            }
+
+            @SneakyThrows
+            @CommandLine.Command(name = "get", aliases = "g", description = "get mysql instance")
+            void get(
+                    @CommandLine.Option(names = {"-c", "--compartment"}, required = true, description = "compartment name")
+                    String compartment,
+                    @CommandLine.Option(names = {"-n", "--name"}) String name
+            ) {
+                String compartmentId = INSTANCE.getCompartment(compartment).getId();
+                System.out.println(INSTANCE.mapper.writeValueAsString(INSTANCE.getMysqlInCompartment(compartmentId, name)));
+            }
+        }
+
+        @CommandLine.Command(name = "bastion", description = "bastion instances")
+        static class Bastion {
+            @SneakyThrows
+            @CommandLine.Command(name = "list", aliases = "l", description = "list bastion instances in tenancy")
+            void list(@CommandLine.Option(names = {"-c", "--compartment"}, required = true, description = "compartment name") String compartment) {
+                String compartmentId = INSTANCE.getCompartment(compartment).getId();
+                System.out.println(INSTANCE.mapper.writeValueAsString(INSTANCE.listBastionInCompartment(compartmentId)));
+            }
+
+            @SneakyThrows
+            @CommandLine.Command(name = "get", aliases = "g", description = "get bastion instance")
+            void get(
+                    @CommandLine.Option(names = {"-c", "--compartment"}, required = true, description = "compartment name")
+                    String compartment,
+                    @CommandLine.Option(names = {"-n", "--name"}) String name
+            ) {
+                String compartmentId = INSTANCE.getCompartment(compartment).getId();
+                System.out.println(INSTANCE.mapper.writeValueAsString(INSTANCE.getBastionInCompartment(compartmentId, name)));
+            }
+        }
+
+        @CommandLine.Command(name = "oke", aliases = {"oke-cluster", "k8s", "kubernetes", "kubernetes-cluster"}, description = "oke instances")
+        static class OkeCluster {
+            @SneakyThrows
+            @CommandLine.Command(name = "list", aliases = "l", description = "list oke instances in tenancy")
+            void list(@CommandLine.Option(names = {"-c", "--compartment"}, required = true, description = "compartment name") String compartment) {
+                String compartmentId = INSTANCE.getCompartment(compartment).getId();
+                System.out.println(INSTANCE.mapper.writeValueAsString(INSTANCE.listOkeClusterInCompartment(compartmentId)));
+            }
+
+            @SneakyThrows
+            @CommandLine.Command(name = "get", aliases = "g", description = "get oke instance")
+            void get(
+                    @CommandLine.Option(names = {"-c", "--compartment"}, required = true, description = "compartment name")
+                    String compartment,
+                    @CommandLine.Option(names = {"-n", "--name"}) String name
+            ) {
+                String compartmentId = INSTANCE.getCompartment(compartment).getId();
+                System.out.println(INSTANCE.mapper.writeValueAsString(INSTANCE.getOkeClusterInCompartment(compartmentId, name)));
+            }
+        }
     }
 
     @CommandLine.Command(name = "bastion-utils", aliases = "bu", description = "bastion connection utilities")
@@ -88,15 +153,17 @@ class OciHelpersCli {
                 String clusterName
         ) {
             var c = INSTANCE.getCompartment(compartment);
-            BastionListItem bastion = (
-                    bastionName != null
-                            ? INSTANCE.getCompartmentIdBastion(c.getId(), bastionName)
-                            : INSTANCE.getCompartmentIdOnlyBastion(c.getId())
+            BastionListItem bastion;
+            bastion = bastionName != null ? (
+                    INSTANCE.getBastionInCompartment(c.getId(), bastionName)
+            ) : (
+                    INSTANCE.getBastionInCompartment(c.getId(), null)
             );
-            OkeClusterListItem cluster = (
-                    clusterName != null
-                            ? INSTANCE.getCompartmentIdOkeCluster(c.getId(), clusterName)
-                            : INSTANCE.getCompartmentIdOnlyOkeCluster(c.getId())
+            OkeClusterListItem cluster;
+            cluster = clusterName != null ? (
+                    INSTANCE.getOkeClusterInCompartment(c.getId(), clusterName)
+            ) : (
+                    INSTANCE.getOkeClusterInCompartment(c.getId(), null)
             );
 
             String privateEndpoint = cluster.getEndpoints().getPrivateEndpoint();
@@ -130,18 +197,22 @@ class OciHelpersCli {
                 String dbId
         ) {
             var c = INSTANCE.getCompartment(compartment);
-            BastionListItem bastion = (
-                    bastionName != null
-                            ? INSTANCE.getCompartmentIdBastion(c.getId(), bastionName)
-                            : INSTANCE.getCompartmentIdOnlyBastion(c.getId())
+            BastionListItem bastion;
+            bastion = bastionName != null ? (
+                    INSTANCE.getBastionInCompartment(c.getId(), bastionName)
+            ) : (
+                    INSTANCE.getBastionInCompartment(c.getId(), null)
             );
-            MysqlClusterListItem cluster = (
-                    dbName != null
-                            ? INSTANCE.getCompartmentIdMysqlClusterByName(c.getId(), dbName)
-                            : (
-                            dbId != null
-                                    ? INSTANCE.getCompartmentIdMysqlClusterById(dbId)
-                                    : INSTANCE.getCompartmentIdOnlyMysqlCluster(c.getId())
+            MysqlClusterListItem cluster;
+            cluster = dbName != null ? (
+                    INSTANCE.getMysqlInCompartment(c.getId(), dbName)
+            ) : dbId != null ? (
+                    (
+                            INSTANCE.getMysqlById(dbId)
+                    )
+            ) : (
+                    (
+                            INSTANCE.getMysqlInCompartment(c.getId(), null)
                     )
             );
 
@@ -186,10 +257,10 @@ class OciHelpersCli {
                 cluster = INSTANCE.getCompartmentIdOkeClusterById(clusterId);
             } else {
                 var c = INSTANCE.getCompartment(compartment);
-                cluster = (
-                        clusterName != null
-                                ? INSTANCE.getCompartmentIdOkeCluster(c.getId(), clusterName)
-                                : INSTANCE.getCompartmentIdOnlyOkeCluster(c.getId())
+                cluster = clusterName != null ? (
+                        INSTANCE.getOkeClusterInCompartment(c.getId(), clusterName)
+                ) : (
+                        INSTANCE.getOkeClusterInCompartment(c.getId(), null)
                 );
             }
 

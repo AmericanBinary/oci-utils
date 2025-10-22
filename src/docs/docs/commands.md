@@ -91,16 +91,127 @@ defaulting to `~/.kube/config`.
 
 ```console
 $ oci-utils ku clc
-Missing required option: '--compartment=<arg0>'
-Usage: oci-utils kubectl-utils configure-localhost-context [-hV] -c=<arg0>
-       [-f=<arg3>] [-k=<arg1>] [-ki=<arg2>]
+Missing required option: '--compartment=<compartment>'
+Usage: oci-utils kubectl-utils configure-localhost-context [-hV]
+       -c=<compartment> [-f=<file>] [-k=<clusterName>] [-ki=<clusterId>]
 creates a kubectl context corresponding to an OKE cluster
-  -c, --compartment=<arg0>   compartment name
-  -k, --cluster-name=<arg1>  precedence over --cluster-id, defaults to sole
+  -c, --compartment=<compartment>
+                             compartment name
+  -k, --cluster-name=<clusterName>
+                             precedence over --cluster-id, defaults to sole
                                cluster in compartment
-      -ki, --cluster-id=<arg2>
+      -ki, --cluster-id=<clusterId>
 
-  -f, --config-file=<arg3>   defaults to ${KUBECONFIG:-~/.kube/config}
+  -f, --config-file=<file>   defaults to ${KUBECONFIG:-~/.kube/config}
   -h, --help                 Show this help message and exit.
   -V, --version              Print version information and exit.
+```
+
+## `oci-utils util -h`
+
+```console
+$ oci-utils u -h
+Usage: oci-utils util [-hV] [COMMAND]
+general utilities
+  -h, --help      Show this help message and exit.
+  -V, --version   Print version information and exit.
+Commands:
+  compartments, co, comp
+  config, c
+  mysql                                     mysql instances
+  bastion                                   bastion instances
+  oke, oke-cluster, k8s, kubernetes, kubernetes-cluster
+                                            kubernetes instances
+```
+
+## `oci-utils u co -h`
+
+```console
+Usage: oci-utils util compartments [-hV] [COMMAND]
+
+  -h, --help      Show this help message and exit.
+  -V, --version   Print version information and exit.
+Commands:
+  get, g   get compartment
+  list, l  list compartments in tenancy
+```
+
+## `oci-utils u co g -h`
+
+```console
+Usage: oci-utils util compartments get [-hV] -n=<name>
+get compartment
+  -n, --name=<name>
+  -h, --help          Show this help message and exit.
+  -V, --version       Print version information and exit.
+```
+
+## `oci-utils u co l -h`
+
+```console
+Usage: oci-utils util compartments list [-hV]
+list compartments in tenancy
+  -h, --help      Show this help message and exit.
+  -V, --version   Print version information and exit.
+```
+
+## `oci-utils u bastion -h`
+
+```console
+$ oci-utils u bastion -h
+Usage: oci-utils util bastion [-hV] [COMMAND]
+bastion instances
+  -h, --help      Show this help message and exit.
+  -V, --version   Print version information and exit.
+Commands:
+  get, g   get bastion instance
+  list, l  list bastion instances in tenancy
+```
+
+## `oci-utils u bastion g -h`
+
+```console
+Usage: oci-utils util bastion get [-hV] -c=<compartment> [-n=<name>]
+get bastion instance
+  -c, --compartment=<compartment>
+                      compartment name
+  -n, --name=<name>
+  -h, --help          Show this help message and exit.
+  -V, --version       Print version information and exit.
+```
+
+## `oci-utils u bastion l -h`
+
+```console
+Usage: oci-utils util bastion list [-hV] -c=<compartment>
+list bastion instances in tenancy
+  -c, --compartment=<compartment>
+                  compartment name
+  -h, --help      Show this help message and exit.
+  -V, --version   Print version information and exit.
+```
+
+## `oci-utils u mysql -h`
+
+```console
+Usage: oci-utils util mysql [-hV] [COMMAND]
+
+  -h, --help      Show this help message and exit.
+  -V, --version   Print version information and exit.
+Commands:
+  get, g   get compartment
+  list, l  list compartments in tenancy
+```
+
+## `oci-utils u oke -h`
+
+```console
+$ oci-utils u oke -h
+Usage: oci-utils util oke [-hV] [COMMAND]
+oke instances
+  -h, --help      Show this help message and exit.
+  -V, --version   Print version information and exit.
+Commands:
+  get, g   get oke instance
+  list, l  list oke instances in tenancy
 ```

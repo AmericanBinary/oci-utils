@@ -1,9 +1,7 @@
 package oci_utils;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.retry.RetryConfig;
 import io.github.resilience4j.retry.RetryRegistry;
 import lombok.*;
@@ -20,7 +18,6 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 
 @Data
@@ -74,61 +71,44 @@ public class OciHelpers {
         var result = run("oci iam compartment list --compartment-id " + tenancy + " --name " + name);
         var compartments = mapper.readValue(result.output(), new TypeReference<BaseOciDataList<CompartmentListItem>>() {
         });
-        if (compartments.getData().size() != 1) {
-            throw new IllegalStateException("Expected one compartment in list but found " + compartments.getData().size() + ": " + compartments.getData());
-        }
-        return compartments.getData().getFirst();
+        return one(compartments);
     }
 
     @SneakyThrows
-    public BastionListItem getCompartmentOnlyBastion(String compartmentName) {
-        String compartmentId = getCompartment(compartmentName).getId();
-        return getCompartmentIdOnlyBastion(compartmentId);
-    }
-
-    @SneakyThrows
-    public BastionListItem getCompartmentIdOnlyBastion(String compartmentId) {
-        var result = run("oci bastion bastion list --compartment-id " + compartmentId + " --all"); // also supports --name
-        var bastions = mapper.readValue(result.output(), new TypeReference<BaseOciDataList<BastionListItem>>() {
+    public BaseOciDataList<BastionListItem> listBastionInCompartment(String compartmentId) {
+        var result = run("oci bastion bastion list --compartment-id " + compartmentId + " --all");
+        return mapper.readValue(result.output(), new TypeReference<>() {
         });
-        if (bastions.getData().size() != 1) {
-            throw new IllegalStateException("Expected one bastion in list but found " + bastions.getData().size() + ": " + bastions.getData());
-        }
-        return bastions.getData().getFirst();
     }
 
     @SneakyThrows
-    public BastionListItem getCompartmentIdBastion(String compartmentId, String bastionName) {
-        var result = run("oci bastion bastion list --compartment-id " + compartmentId + " --name " + bastionName);
-        var bastions = mapper.readValue(result.output(), new TypeReference<BaseOciDataList<BastionListItem>>() {
-        });
-        if (bastions.getData().size() != 1) {
-            throw new IllegalStateException("Expected one bastion in list but found " + bastions.getData().size() + ": " + bastions.getData());
+    public BastionListItem getBastionInCompartment(String compartmentId, String name) {
+        if (name == null) {
+            one(listBastionInCompartment(compartmentId));
         }
-        return bastions.getData().getFirst();
+
+        var result = run("oci bastion bastion list --compartment-id " + compartmentId + " --name " + name);
+        // noinspection Convert2Diamond
+        return one(mapper.readValue(result.output(), new TypeReference<BaseOciDataList<BastionListItem>>() {
+        }));
+    }
+
+    @SneakyThrows
+    public BaseOciDataList<OkeClusterListItem> listOkeClusterInCompartment(String compartmentId) {
+        return mapper.readValue(run("oci ce cluster list --compartment-id " + compartmentId).output(), new TypeReference<>() {
+        });
     }
 
     // cluster_info="$(oci ce cluster list --compartment-id ${compartment_id} --name ${cluster_name} | jq -c .)"
     @SneakyThrows
-    public OkeClusterListItem getCompartmentIdOnlyOkeCluster(String compartmentId) {
-        var result = run("oci ce cluster list --compartment-id " + compartmentId); // also supports --name
-        var bastions = mapper.readValue(result.output(), new TypeReference<BaseOciDataList<OkeClusterListItem>>() {
-        });
-        if (bastions.getData().size() != 1) {
-            throw new IllegalStateException("Expected one bastion in list but found " + bastions.getData().size() + ": " + bastions.getData());
+    public OkeClusterListItem getOkeClusterInCompartment(String compartmentId, String name) {
+        if (name == null) {
+            return one(listOkeClusterInCompartment(compartmentId));
         }
-        return bastions.getData().getFirst();
-    }
 
-    @SneakyThrows
-    public OkeClusterListItem getCompartmentIdOkeCluster(String compartmentId, String clusterName) {
-        var result = run("oci ce cluster list --compartment-id " + compartmentId + " --name " + clusterName);
-        var bastions = mapper.readValue(result.output(), new TypeReference<BaseOciDataList<OkeClusterListItem>>() {
-        });
-        if (bastions.getData().size() != 1) {
-            throw new IllegalStateException("Expected one bastion in list but found " + bastions.getData().size() + ": " + bastions.getData());
-        }
-        return bastions.getData().getFirst();
+        // noinspection Convert2Diamond
+        return one(mapper.readValue(run("oci ce cluster list --compartment-id " + compartmentId + " --name " + name).output(), new TypeReference<BaseOciDataList<OkeClusterListItem>>() {
+        }));
     }
 
     @SneakyThrows
@@ -193,28 +173,26 @@ public class OciHelpers {
     }
 
     @SneakyThrows
-    public MysqlClusterListItem getCompartmentIdOnlyMysqlCluster(String compartmentId) {
+    public BaseOciDataList<MysqlClusterListItem> listMysqlInCompartment(String compartmentId) {
         var result = run("oci mysql db-system list --compartment-id " + compartmentId);
-        return getMysqlClusterListItem(result);
-    }
-
-    @SneakyThrows
-    public MysqlClusterListItem getCompartmentIdMysqlClusterByName(String compartmentId, String clusterName) {
-        var result = run("oci mysql db-system list --compartment-id " + compartmentId + " --display-name " + clusterName);
-        return getMysqlClusterListItem(result);
-    }
-
-    private MysqlClusterListItem getMysqlClusterListItem(RunResult result) throws JsonProcessingException {
-        var mysqlClusters = mapper.readValue(result.output(), new TypeReference<BaseOciDataList<MysqlClusterListItem>>() {
+        return mapper.readValue(result.output(), new TypeReference<>() {
         });
-        if (mysqlClusters.getData().size() != 1) {
-            throw new IllegalStateException("Expected only one mysql cluster in 'oci mysql db-system list' output but found " + mysqlClusters.getData().size() + ": " + mysqlClusters.getData());
-        }
-        return mysqlClusters.getData().getFirst();
     }
 
     @SneakyThrows
-    public MysqlClusterListItem getCompartmentIdMysqlClusterById(String id) {
+    public MysqlClusterListItem getMysqlInCompartment(String compartmentId, String name) {
+        if (name == null) {
+            return one(listMysqlInCompartment(compartmentId));
+        }
+
+        var result = run("oci mysql db-system list --compartment-id " + compartmentId + " --display-name " + name);
+        // noinspection Convert2Diamond
+        return one(mapper.readValue(result.output(), new TypeReference<BaseOciDataList<MysqlClusterListItem>>() {
+        }));
+    }
+
+    @SneakyThrows
+    public MysqlClusterListItem getMysqlById(String id) {
         var result = run("oci mysql db-system get --db-system-id " + id);
         var item = mapper.readValue(result.output(), new TypeReference<BaseOciDataItem<MysqlClusterListItem>>() {
         });
@@ -297,6 +275,14 @@ public class OciHelpers {
         return runResult;
     }
 
+    <T extends BaseOciEntity> T one(BaseOciDataList<T> list) {
+        if (list.getData().size() != 1) {
+            List<String> names = list.getData().stream().map(BaseOciEntity::getName).toList();
+            throw new MultipleResultError(names);
+        }
+        return list.getData().getFirst();
+    }
+
     public record LocalPortForward(int localPort, String remoteHost, int remotePort) {
     }
 
@@ -308,5 +294,17 @@ public class OciHelpers {
     @Accessors(chain = true)
     public static class RunResultError extends RuntimeException {
         RunResult runResult;
+    }
+
+    @EqualsAndHashCode(callSuper = false)
+    @Data
+    @Accessors(chain = true)
+    public static class MultipleResultError extends RuntimeException {
+        final List<String> names;
+
+        @Override
+        public String getMessage() {
+            return "Expected one item but found these instead: " + String.join(", ", names);
+        }
     }
 }

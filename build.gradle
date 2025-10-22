@@ -57,6 +57,26 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
+tasks.withType(JavaCompile).configureEach { options.compilerArgs.add '-parameters' }
+
+tasks.withType(Test).configureEach { useJUnitPlatform() }
+
+// mockito boilerplate
+configurations { mockitoAgent {} }
+dependencies {
+    mockitoAgent platform('org.springframework.boot:spring-boot-dependencies:3.4.4')
+    mockitoAgent("org.mockito:mockito-core") { transitive = false }
+}
+tasks.withType(Test).configureEach { jvmArgs('-Xshare:off', "-javaagent:${configurations.mockitoAgent.asPath}") }
+
+// copy to latest
+tasks.named('shadowJar').configure { finalizedBy('copyShadowJarToLatest') }
+tasks.register('copyShadowJarToLatest', Copy) {
+    from tasks.shadowJar.outputs.files.singleFile
+    into tasks.shadowJar.outputs.files.singleFile.parent
+    rename '.*', 'oci-utils-latest-all.jar'
+}
+
 def projectName = project.name
 def directoryInPath = new File(
         System.getenv('INSTALL_DIRECTORY') ?:
