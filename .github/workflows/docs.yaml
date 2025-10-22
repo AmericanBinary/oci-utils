@@ -10,7 +10,7 @@ on:
     branches:
       - master
     paths: &paths
-      - src/docs
+      - src/docs/**
       - .github/workflows/docs.yaml
   pull_request:
     branches:

@@ -4,6 +4,7 @@ site_dir: build
 nav:
   - Home: index.md
   - Getting Started: intro.md
+  - Changelog: changelog.md
   - Command Reference: commands.md
 
 theme:
