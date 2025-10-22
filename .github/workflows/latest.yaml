@@ -9,6 +9,7 @@ on:
       - master
     paths: &paths
       - version.txt
+      - .github/workflows/latest.yaml
   pull_request:
     branches:
       - master
@@ -33,7 +34,6 @@ jobs:
           retention-days: 1
 
   publish:
-    needs: [ build ]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master' # when merged
     runs-on: ubuntu-latest
     steps:
