@@ -22,3 +22,7 @@
 ## `0.0.4` - `2025-10-22T11:42:36-04:00`
 
 * finish fixing latest upload
+
+## `0.0.5` - `2025-10-22T13:21:36-04:00`
+
+* download after checkout
