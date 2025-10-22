@@ -18,3 +18,8 @@
 ## `0.0.3` - `2025-10-22T11:37:16-04:00`
 
 * fix latest upload
+
+## `0.0.4` - `2025-10-22T11:42:36-04:00`
+
+* finish fixing latest upload
+* attempt to optimize away redundant builds
