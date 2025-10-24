@@ -25,7 +25,7 @@ jobs:
       # build site
       - { uses: actions/checkout@v4 }
       - { uses: actions/setup-java@v5, with: { distribution: 'temurin', java-version: '21', cache: 'gradle' } }
-      - run: ./gradlew shadowJar
+      - run: ./gradlew build
       - id: version
         run: echo "VERSION=$(cat version.txt)" >> "${GITHUB_OUTPUT}"
 
