@@ -84,7 +84,7 @@ public class OciHelpers {
     @SneakyThrows
     public BastionListItem getBastionInCompartment(String compartmentId, String name) {
         if (name == null) {
-            one(listBastionInCompartment(compartmentId));
+            return one(listBastionInCompartment(compartmentId));
         }
 
         var result = run("oci bastion bastion list --compartment-id " + compartmentId + " --name " + name);
