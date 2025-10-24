@@ -26,3 +26,7 @@
 ## `0.0.5` - `2025-10-22T13:21:36-04:00`
 
 * download after checkout
+
+## `0.0.6` - `2025-10-24T13:21:36-04:00`
+
+* publish all installers?
