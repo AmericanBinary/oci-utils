@@ -1,7 +1,7 @@
 # oci-utils
 helpers for working with oci command line tool (https://pypi.org/project/oci-cli/)
 
-single binary installation:
+### single binary installation:
 
 ```shell
 curl -fSsL $(
@@ -11,7 +11,13 @@ chmod +x ./oci-utils
 ./oci-utils --version # move oci-utils into PATH
 ```
 
-all platforms installation:
+installation into `~/.local/bin`:
+
+```shell
+curl -fSsL $(curl -fSsL https://api.github.com/repos/AmericanBinary/oci-utils/releases/latest | jq '.assets[] | select(.name == "oci-utils") | .browser_download_url' -r) --output ~/.local/bin/oci-utils && chmod $_
+```
+
+### all platforms installation:
 
 ```shell
 curl -fSsL $(
