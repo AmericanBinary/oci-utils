@@ -7,7 +7,7 @@ plugins {
     id 'java'
     id 'jacoco'
     id 'application'
-    id 'com.gradleup.shadow' version '8.3.6'
+    id 'com.gradleup.shadow' version '9.2.2'
 }
 
 group = 'ab-oci-utils'
@@ -69,34 +69,42 @@ dependencies {
 }
 tasks.withType(Test).configureEach { jvmArgs('-Xshare:off', "-javaagent:${configurations.mockitoAgent.asPath}") }
 
-// copy to latest
+// copy to latest - shadowJar
 tasks.named('shadowJar').configure { finalizedBy('copyShadowJarToLatest') }
 tasks.register('copyShadowJarToLatest', Copy) {
     from tasks.shadowJar.outputs.files.singleFile
-    into tasks.shadowJar.outputs.files.singleFile.parent
+    into layout.buildDirectory.dir('bins')
     rename '.*', 'oci-utils-latest-all.jar'
 }
 
+// create zip for PATH directory
 def projectName = project.name
 def directoryInPath = new File(
         System.getenv('INSTALL_DIRECTORY') ?:
                 new File(new File(System.getProperty('user.home'), '.local'), 'bin').getPath()
 )
 
+// create launcher file for zip
 def pathZipLauncher = tasks.register('pathZipLauncher') {
     dependsOn 'shadowJar'
 
     def scriptFile = layout.buildDirectory.file('tmp/pathZipLauncher').get().asFile
     outputs.file(scriptFile)
+
+    def fileName = tasks.shadowJar.outputs.files.singleFile.toPath().fileName
     doLast {
         scriptFile.text = """
             #!/usr/bin/env bash
-            java -jar "\$(dirname "\$0")/${tasks.shadowJar.outputs.files.singleFile.toPath().fileName}" "\$@"
-        """.stripIndent()
+            java -jar "\$(dirname "\$0")/${fileName}" "\$@"
+        """
+                .stripIndent()
+                .stripLeading()
         scriptFile.setExecutable(true)
     }
 }
 
+// create zip with jar and launcher
+tasks.named('build').configure { dependsOn('pathZip') }
 def pathZip = tasks.register('pathZip', Zip) {
     group = 'build'
     description = 'build a zip for unzipping in a PATH dir'
@@ -109,6 +117,14 @@ def pathZip = tasks.register('pathZip', Zip) {
         }
         rename { projectName }
     }
+
+    finalizedBy 'copyPathZipToLatest'
+}
+
+tasks.register('copyPathZipToLatest', Copy) {
+    from tasks.pathZip.outputs.files.singleFile
+    into layout.buildDirectory.dir('bins')
+    rename '.*', 'oci-utils-latest.zip'
 }
 
 tasks.register('pathZipInstall', Copy) {
@@ -120,6 +136,7 @@ tasks.register('pathZipInstall', Copy) {
     into directoryInPath
 }
 
+tasks.named('build').configure { dependsOn('executableJar') }
 def executableJar = tasks.register('executableJar') {
     group = 'build'
     description = 'build an executable jar that you can place in your PATH'
@@ -138,6 +155,14 @@ def executableJar = tasks.register('executableJar') {
             Files.setPosixFilePermissions(outputFile, PosixFilePermissions.fromString("rwxr-xr-x"))
         }
     }
+
+    finalizedBy 'executableJarToCommand'
+}
+
+tasks.register('executableJarToCommand', Copy) {
+    from executableJar
+    into layout.buildDirectory.dir('bins')
+    rename '.*', 'oci-utils'
 }
 
 tasks.register('executableJarInstall', Copy) {
