@@ -30,3 +30,7 @@
 ## `0.0.6` - `2025-10-24T13:21:36-04:00`
 
 * publish all installers?
+
+## `0.0.7` - `2025-10-24T13:11:38-04:00`
+
+* fix getting only bastion of compartment
