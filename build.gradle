@@ -80,10 +80,13 @@ tasks.register('copyShadowJarToLatest', Copy) {
 // copy to latest - zip
 tasks.named('build').configure { dependsOn('distZip') }
 tasks.named('distZip').configure { finalizedBy('copyDistZipToLatest') }
-tasks.register('copyDistZipToLatest', Copy) {
-    from tasks.distZip.outputs.files.singleFile
-    into layout.buildDirectory.dir('bins')
-    rename '.*', 'oci-utils-latest.zip'
+tasks.register('copyDistZipToLatest', Zip) {
+    def oldDir = "^oci-utils-${version}"
+    from(zipTree(tasks.distZip.outputs.files.singleFile)) {
+        eachFile { FileCopyDetails f -> f.path = f.path.replaceFirst(oldDir, 'oci-utils-latest') }
+    }
+    destinationDirectory = layout.buildDirectory.dir('bins')
+    archiveFileName ='oci-utils-latest.zip'
 }
 
 tasks.named('build').configure { dependsOn('executableJar') }
