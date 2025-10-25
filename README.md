@@ -17,13 +17,18 @@ installation into `~/.local/bin`:
 curl -fSsL $(curl -fSsL https://api.github.com/repos/AmericanBinary/oci-utils/releases/latest | jq '.assets[] | select(.name == "oci-utils") | .browser_download_url' -r) --output ~/.local/bin/oci-utils && chmod $_
 ```
 
-### all platforms installation:
+### Windows/all platforms installation:
 
-```shell
-curl -fSsL $(
-  curl -fSsL https://api.github.com/repos/AmericanBinary/oci-utils/releases/latest \
-    | jq '.assets[] | select(.name == "oci-utils-latest.zip") | .browser_download_url' -r) --output oci-utils-latest.zip
-unzip oci-utils-latest.zip && rm oci-utils-latest.zip
-chmod +x oci-utils
-./oci-utils --version # move oci-utils AND the jar file into PATH
+Download the `distZip` output, unzip and add `$dest/oci-utils-latest/bin` to the PATH:
+
+Untested, since this documentation is written before the actual release:
+
+```powershell
+$release = Invoke-RestMethod -Uri "https://api.github.com/repos/AmericanBinary/oci-utils/releases/latest"
+$asset = $release.assets | Where-Object { $_.name -eq "oci-utils-latest.zip" }
+Invoke-WebRequest -Uri $asset.browser_download_url -OutFile "oci-utils-latest.zip"
+
+Expand-Archive -Path "oci-utils-latest.zip" -DestinationPath "$HOME\.somewhere" -Force
+$env:PATH += ";$HOME\.somewhere\oci-utils-latest\bin"
+oci-utils --help
 ```
