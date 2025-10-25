@@ -81,10 +81,19 @@ tasks.register('copyShadowJarToLatest', Copy) {
 tasks.named('build').configure { dependsOn('distZip') }
 tasks.named('distZip').configure { finalizedBy('copyDistZipToLatest') }
 tasks.register('copyDistZipToLatest', Zip) {
+    /*
+        this lets us do the following:
+
+        unzip -d ~/.somewhere oci-utils-latest.zip # in Git BASH for Windows
+
+        set "PATH=%PATH%;C:\Users\%USERNAME%\.somewhere\oci-utils-latest\bin" & rem Adding the extracted files to PATH
+        oci-utils --help
+     */
     def oldDir = "^oci-utils-${version}"
     from(zipTree(tasks.distZip.outputs.files.singleFile)) {
         eachFile { FileCopyDetails f -> f.path = f.path.replaceFirst(oldDir, 'oci-utils-latest') }
     }
+
     destinationDirectory = layout.buildDirectory.dir('bins')
     archiveFileName ='oci-utils-latest.zip'
 }
