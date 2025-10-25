@@ -102,7 +102,8 @@ def executableJar = tasks.register('executableJar') {
         try (var os = Files.newOutputStream(outputFile, StandardOpenOption.CREATE)) {
             os.write('#!/usr/bin/env -S java -jar\n'.getBytes())
             os.write(Files.readAllBytes(inputFile))
-            Files.setPosixFilePermissions(outputFile, PosixFilePermissions.fromString("rwxr-xr-x"))
+            if (outputFile.fileSystem.supportedFileAttributeViews().contains('posix'))
+                Files.setPosixFilePermissions(outputFile, PosixFilePermissions.fromString("rwxr-xr-x"))
         }
     }
 
