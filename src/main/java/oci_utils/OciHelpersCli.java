@@ -39,6 +39,7 @@ class OciHelpersCli {
     LogbackVerbosityMixin verbosityMixin;
 
     public static void main(String[] args) {
+        LogbackVerbosityMixin.setConsoleAppenderOutputStreamToSystemErr();
         System.exit(new CommandLine(new OciHelpersCli()).execute(args));
     }
 
