@@ -77,63 +77,25 @@ tasks.register('copyShadowJarToLatest', Copy) {
     rename '.*', 'oci-utils-latest-all.jar'
 }
 
-// create zip for PATH directory
-def projectName = project.name
-def directoryInPath = new File(
-        System.getenv('INSTALL_DIRECTORY') ?:
-                new File(new File(System.getProperty('user.home'), '.local'), 'bin').getPath()
-)
+// copy to latest - zip
+tasks.named('build').configure { dependsOn('distZip') }
+tasks.named('distZip').configure { finalizedBy('copyDistZipToLatest') }
+tasks.register('copyDistZipToLatest', Zip) {
+    /*
+        this lets us do the following:
 
-// create launcher file for zip
-def pathZipLauncher = tasks.register('pathZipLauncher') {
-    dependsOn 'shadowJar'
+        unzip -d ~/.somewhere oci-utils-latest.zip # in Git BASH for Windows
 
-    def scriptFile = layout.buildDirectory.file('tmp/pathZipLauncher').get().asFile
-    outputs.file(scriptFile)
-
-    def fileName = tasks.shadowJar.outputs.files.singleFile.toPath().fileName
-    doLast {
-        scriptFile.text = """
-            #!/usr/bin/env bash
-            java -jar "\$(dirname "\$0")/${fileName}" "\$@"
-        """
-                .stripIndent()
-                .stripLeading()
-        scriptFile.setExecutable(true)
-    }
-}
-
-// create zip with jar and launcher
-tasks.named('build').configure { dependsOn('pathZip') }
-def pathZip = tasks.register('pathZip', Zip) {
-    group = 'build'
-    description = 'build a zip for unzipping in a PATH dir'
-
-    archiveBaseName = projectName + '-pathZip'
-    from tasks.shadowJar
-    from(pathZipLauncher) {
-        filePermissions {
-            unix 0755
-        }
-        rename { projectName }
+        set "PATH=%PATH%;C:\Users\%USERNAME%\.somewhere\oci-utils-latest\bin" & rem Adding the extracted files to PATH
+        oci-utils --help
+     */
+    def oldDir = "^oci-utils-${version}"
+    from(zipTree(tasks.distZip.outputs.files.singleFile)) {
+        eachFile { FileCopyDetails f -> f.path = f.path.replaceFirst(oldDir, 'oci-utils-latest') }
     }
 
-    finalizedBy 'copyPathZipToLatest'
-}
-
-tasks.register('copyPathZipToLatest', Copy) {
-    from tasks.pathZip.outputs.files.singleFile
-    into layout.buildDirectory.dir('bins')
-    rename '.*', 'oci-utils-latest.zip'
-}
-
-tasks.register('pathZipInstall', Copy) {
-    group = 'install'
-    description = 'install via the pathZip'
-    dependsOn pathZip
-
-    from zipTree(pathZip.get().outputs.files.singleFile)
-    into directoryInPath
+    destinationDirectory = layout.buildDirectory.dir('bins')
+    archiveFileName ='oci-utils-latest.zip'
 }
 
 tasks.named('build').configure { dependsOn('executableJar') }
@@ -152,7 +114,8 @@ def executableJar = tasks.register('executableJar') {
         try (var os = Files.newOutputStream(outputFile, StandardOpenOption.CREATE)) {
             os.write('#!/usr/bin/env -S java -jar\n'.getBytes())
             os.write(Files.readAllBytes(inputFile))
-            Files.setPosixFilePermissions(outputFile, PosixFilePermissions.fromString("rwxr-xr-x"))
+            if (outputFile.fileSystem.supportedFileAttributeViews().contains('posix'))
+                Files.setPosixFilePermissions(outputFile, PosixFilePermissions.fromString("rwxr-xr-x"))
         }
     }
 
