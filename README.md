@@ -14,7 +14,7 @@ chmod +x ./oci-utils
 installation into `~/.local/bin`:
 
 ```shell
-curl -fSsL $(curl -fSsL https://api.github.com/repos/AmericanBinary/oci-utils/releases/latest | jq '.assets[] | select(.name == "oci-utils") | .browser_download_url' -r) --output ~/.local/bin/oci-utils && chmod $_
+curl -fSsL $(curl -fSsL https://api.github.com/repos/AmericanBinary/oci-utils/releases/latest | jq '.assets[] | select(.name == "oci-utils") | .browser_download_url' -r) --output ~/.local/bin/oci-utils && chmod +x $_
 ```
 
 ### Windows/all platforms installation:
