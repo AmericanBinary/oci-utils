@@ -1,6 +1,5 @@
 package oci_utils.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.Data;
@@ -15,13 +14,13 @@ import java.util.Set;
 @EqualsAndHashCode(callSuper = true)
 @Data
 @Accessors(chain = true)
-@JsonIgnoreProperties(ignoreUnknown = true)
+@Dto
 public class MysqlClusterListItem extends BaseOciEntity {
     List<Endpoint> endpoints;
 
     @Data
     @Accessors(chain = true)
-    @JsonIgnoreProperties(ignoreUnknown = true)
+    @Dto
     public static class Endpoint {
         String hostname;
         @JsonProperty("ip-address")

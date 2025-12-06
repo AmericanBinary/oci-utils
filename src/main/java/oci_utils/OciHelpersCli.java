@@ -13,6 +13,8 @@ import picocli.CommandLine;
 
 import java.io.File;
 import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.List;
 
 @Slf4j
 @CommandLine.Command(
@@ -32,15 +34,34 @@ import java.nio.file.Paths;
 )
 class OciHelpersCli {
     static final OciHelpers INSTANCE = new OciHelpers();
+    static final DataStringFormatter FORMATTER = new DataStringFormatter(INSTANCE.getMapper());
     static final String HOME_SSH_ID_RSA_PUB = Paths.get(System.getProperty("user.home"), ".ssh", "id_rsa.pub").toString();
+    static DataStringFormatter.Format outputFormat = DataStringFormatter.Format.JSON;
+    static List<String> tableColumns = List.of("id", "name", "description");
 
     @SuppressWarnings("unused")
     @CommandLine.Mixin
     LogbackVerbosityMixin verbosityMixin;
 
+    @CommandLine.Option(names = {"--format", "--output", "--output-format"}, defaultValue = "JSON")
+    void setOutputFormat(DataStringFormatter.Format format) {
+        outputFormat = format;
+    }
+
+    @CommandLine.Option(names = {"--format-columns", "--output-columns"},
+            description = "which fields to output (for TABLE format)",
+            defaultValue = "id,name,description")
+    void setOutputFormat(List<String> columns) {
+        if (columns.size() == 1 && columns.getFirst().contains(","))
+            columns = Arrays.asList(columns.getFirst().split(","));
+        tableColumns = columns;
+    }
+
     public static void main(String[] args) {
         LogbackVerbosityMixin.setConsoleAppenderOutputStreamToSystemErr();
-        System.exit(new CommandLine(new OciHelpersCli()).execute(args));
+        System.exit(new CommandLine(new OciHelpersCli())
+                .setCaseInsensitiveEnumValuesAllowed(true)
+                .execute(args));
     }
 
     @CommandLine.Command(name = "util", aliases = "u", description = "general utilities", subcommands = {
@@ -49,20 +70,25 @@ class OciHelpersCli {
             Utils.Mysql.class,
             Utils.Bastion.class,
             Utils.OkeCluster.class,
+            Utils.Custom.class,
     })
     static class Utils {
-        @CommandLine.Command(name = "compartments", aliases = {"co", "comp"})
+        @CommandLine.Command(name = "compartment", aliases = {"co", "comp", "compartments"})
         static class Compartments {
             @SneakyThrows
             @CommandLine.Command(name = "list", aliases = "l", description = "list compartments in tenancy")
             void print() {
-                System.out.println(INSTANCE.mapper.writeValueAsString(INSTANCE.listCompartments()));
+                System.out.println(FORMATTER.formatData(INSTANCE.listCompartments(), outputFormat, tableColumns));
             }
 
             @SneakyThrows
             @CommandLine.Command(name = "get", aliases = "g", description = "get compartment")
-            void get(@CommandLine.Option(names = {"-n", "--name"}, required = true) String name) {
-                System.out.println(INSTANCE.mapper.writeValueAsString(INSTANCE.getCompartment(name)));
+            void get(@CommandLine.Option(names = {"-n", "--name"}, description = "omit for tenancy") String name) {
+                if (name == null) {
+                    System.out.println(FORMATTER.formatData(INSTANCE.getTenancy(), outputFormat, tableColumns));
+                } else {
+                    System.out.println(FORMATTER.formatData(INSTANCE.getCompartment(name), outputFormat, tableColumns));
+                }
             }
         }
 
@@ -73,7 +99,7 @@ class OciHelpersCli {
             void print() {
                 var config = INSTANCE.loadLocalConfig();
                 log.info("Configuration: {}", config);
-                System.out.println(INSTANCE.mapper.writeValueAsString(config));
+                System.out.println(FORMATTER.formatData(config, outputFormat, tableColumns));
             }
         }
 
@@ -83,7 +109,7 @@ class OciHelpersCli {
             @CommandLine.Command(name = "list", aliases = "l", description = "list mysql instances in tenancy")
             void list(@CommandLine.Option(names = {"-c", "--compartment"}, required = true, description = "compartment name") String compartment) {
                 String compartmentId = INSTANCE.getCompartment(compartment).getId();
-                System.out.println(INSTANCE.mapper.writeValueAsString(INSTANCE.listMysqlInCompartment(compartmentId)));
+                System.out.println(FORMATTER.formatData(INSTANCE.listMysqlInCompartment(compartmentId), outputFormat, tableColumns));
             }
 
             @SneakyThrows
@@ -94,7 +120,7 @@ class OciHelpersCli {
                     @CommandLine.Option(names = {"-n", "--name"}) String name
             ) {
                 String compartmentId = INSTANCE.getCompartment(compartment).getId();
-                System.out.println(INSTANCE.mapper.writeValueAsString(INSTANCE.getMysqlInCompartment(compartmentId, name)));
+                System.out.println(FORMATTER.formatData(INSTANCE.getMysqlInCompartment(compartmentId, name), outputFormat, tableColumns));
             }
         }
 
@@ -104,7 +130,7 @@ class OciHelpersCli {
             @CommandLine.Command(name = "list", aliases = "l", description = "list bastion instances in tenancy")
             void list(@CommandLine.Option(names = {"-c", "--compartment"}, required = true, description = "compartment name") String compartment) {
                 String compartmentId = INSTANCE.getCompartment(compartment).getId();
-                System.out.println(INSTANCE.mapper.writeValueAsString(INSTANCE.listBastionInCompartment(compartmentId)));
+                System.out.println(FORMATTER.formatData(INSTANCE.listBastionInCompartment(compartmentId), outputFormat, tableColumns));
             }
 
             @SneakyThrows
@@ -115,7 +141,7 @@ class OciHelpersCli {
                     @CommandLine.Option(names = {"-n", "--name"}) String name
             ) {
                 String compartmentId = INSTANCE.getCompartment(compartment).getId();
-                System.out.println(INSTANCE.mapper.writeValueAsString(INSTANCE.getBastionInCompartment(compartmentId, name)));
+                System.out.println(FORMATTER.formatData(INSTANCE.getBastionInCompartment(compartmentId, name), outputFormat, tableColumns));
             }
         }
 
@@ -125,7 +151,7 @@ class OciHelpersCli {
             @CommandLine.Command(name = "list", aliases = "l", description = "list oke instances in tenancy")
             void list(@CommandLine.Option(names = {"-c", "--compartment"}, required = true, description = "compartment name") String compartment) {
                 String compartmentId = INSTANCE.getCompartment(compartment).getId();
-                System.out.println(INSTANCE.mapper.writeValueAsString(INSTANCE.listOkeClusterInCompartment(compartmentId)));
+                System.out.println(FORMATTER.formatData(INSTANCE.listOkeClusterInCompartment(compartmentId), outputFormat, tableColumns));
             }
 
             @SneakyThrows
@@ -136,7 +162,17 @@ class OciHelpersCli {
                     @CommandLine.Option(names = {"-n", "--name"}) String name
             ) {
                 String compartmentId = INSTANCE.getCompartment(compartment).getId();
-                System.out.println(INSTANCE.mapper.writeValueAsString(INSTANCE.getOkeClusterInCompartment(compartmentId, name)));
+                System.out.println(FORMATTER.formatData(INSTANCE.getOkeClusterInCompartment(compartmentId, name), outputFormat, tableColumns));
+            }
+        }
+
+        @CommandLine.Command(name = "ci", aliases = {"ci", "custom-image", "custom-images"}, description = "custom compute instance images")
+        static class Custom {
+            @SneakyThrows
+            @CommandLine.Command(name = "list", aliases = "l", description = "list custom compute instance images in tenancy")
+            void list(@CommandLine.Option(names = {"-c", "--compartment"}, required = true, description = "compartment name") String compartment) {
+                String compartmentId = INSTANCE.getCompartment(compartment).getId();
+                System.out.println(FORMATTER.formatData(INSTANCE.listCustomImagesInCompartment(compartmentId), outputFormat, tableColumns));
             }
         }
     }

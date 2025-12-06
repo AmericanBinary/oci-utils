@@ -122,6 +122,31 @@ Commands:
   bastion                                   bastion instances
   oke, oke-cluster, k8s, kubernetes, kubernetes-cluster
                                             kubernetes instances
+  custom-images, ci                         custom compute instance images
+```
+
+## `oci-utils u ci -h`
+
+```console
+$ oci-utils u ci -h
+Usage: oci-utils util custom-images [-hV] [COMMAND]
+custom compute instance images
+  -h, --help      Show this help message and exit.
+  -V, --version   Print version information and exit.
+Commands:
+  list, l  list custom compute instance images in tenancy
+```
+
+## `oci-utils u ci l -h`
+
+```console
+$ oci-utils u ci l -h
+Usage: oci-utils util custom-images list [-hV] -c=<compartment>
+list custom compute instance images in tenancy
+  -c, --compartment=<compartment>
+                  compartment name
+  -h, --help      Show this help message and exit.
+  -V, --version   Print version information and exit.
 ```
 
 ## `oci-utils u co -h`
@@ -139,9 +164,9 @@ Commands:
 ## `oci-utils u co g -h`
 
 ```console
-Usage: oci-utils util compartments get [-hV] -n=<name>
+Usage: oci-utils util compartments get [-hV] [-n=<name>]
 get compartment
-  -n, --name=<name>
+  -n, --name=<name>   omit for tenancy
   -h, --help          Show this help message and exit.
   -V, --version       Print version information and exit.
 ```

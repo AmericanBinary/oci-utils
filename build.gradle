@@ -35,9 +35,9 @@ configurations {
 }
 
 dependencies {
-    annotationProcessor platform('org.springframework.boot:spring-boot-dependencies:3.4.4')
-    implementation platform('org.springframework.boot:spring-boot-dependencies:3.4.4')
-    implementation platform('org.springframework.cloud:spring-cloud-dependencies:2024.0.0')
+    annotationProcessor platform('org.springframework.boot:spring-boot-dependencies:3.5.8')
+    implementation platform('org.springframework.boot:spring-boot-dependencies:3.5.8')
+    implementation platform('org.springframework.cloud:spring-cloud-dependencies:2025.0.0')
 
     annotationProcessor 'org.projectlombok:lombok'
     compileOnly 'org.projectlombok:lombok'
@@ -51,6 +51,10 @@ dependencies {
     implementation 'org.ini4j:ini4j:0.5.4'
     // https://mvnrepository.com/artifact/io.github.resilience4j/resilience4j-retry
     implementation 'io.github.resilience4j:resilience4j-retry:2.3.0'
+    // https://mvnrepository.com/artifact/de.vandermeer/asciitable
+    implementation 'de.vandermeer:asciitable:0.3.2'
+    // https://mvnrepository.com/artifact/org.jline/jline
+    implementation 'org.jline:jline:3.30.6'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.hamcrest:hamcrest'
@@ -64,7 +68,7 @@ tasks.withType(Test).configureEach { useJUnitPlatform() }
 // mockito boilerplate
 configurations { mockitoAgent {} }
 dependencies {
-    mockitoAgent platform('org.springframework.boot:spring-boot-dependencies:3.4.4')
+    mockitoAgent platform('org.springframework.boot:spring-boot-dependencies:3.5.8')
     mockitoAgent("org.mockito:mockito-core") { transitive = false }
 }
 tasks.withType(Test).configureEach { jvmArgs('-Xshare:off', "-javaagent:${configurations.mockitoAgent.asPath}") }

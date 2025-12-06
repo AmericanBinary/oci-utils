@@ -10,7 +10,7 @@ import java.util.Map;
 
 @Data
 @Accessors(chain = true)
-public class BaseOciDataItem<T> {
+public class BaseOciDataItem<T extends BaseOciEntity> {
     T data;
     @JsonIgnore
     @JsonAnyGetter
