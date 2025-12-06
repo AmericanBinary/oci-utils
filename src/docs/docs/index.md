@@ -17,3 +17,9 @@ Overview of available functionality:
 
 * `oci compute instance list -c $(oci-utils util config print | jq .DEFAULT.tenancy -r)` - list instances in root compartment
 * `oci compute instance list -c $(oci-utils util compartments get --name specific | jq .id -r)` - list instances in specific compartment
+
+`oci-utils` prints its logs to the standard error stream.
+it prints it output to the standard output stream.
+by default the output is in JSON format, but you can specify it:
+`oci-utils --format JSON_PRETTY u compartment get` will indent,
+`oci-utils --format TABLE u compartment get` will show ascii-art table.

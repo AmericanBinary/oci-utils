@@ -1,6 +1,5 @@
 package oci_utils.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -13,7 +12,7 @@ import java.util.Map;
 @EqualsAndHashCode(callSuper = true)
 @Data
 @Accessors(chain = true)
-@JsonIgnoreProperties(ignoreUnknown = true)
+@Dto
 public class OkeClusterListItem extends BaseOciEntity {
     Endpoints endpoints;
 
@@ -22,7 +21,7 @@ public class OkeClusterListItem extends BaseOciEntity {
 
     @Data
     @Accessors(chain = true)
-    @JsonIgnoreProperties(ignoreUnknown = true)
+    @Dto
     public static class Endpoints {
         @JsonProperty("ipv6-endpoint")
         String ipv6Endpoint;

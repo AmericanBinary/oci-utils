@@ -34,3 +34,20 @@
 ## `0.0.7` - `2025-10-24T13:11:38-04:00`
 
 * fix getting only bastion of compartment
+
+## `0.0.8` - `2025-12-06T03:00:49-05:00`
+
+* add `oci-utils u co g` - compartment get without name = get tenancy.
+* add `oci-utils --format table`, and `--format-columns`
+  when `format` is `table`. three modes: `json`, `json_pretty`, `table`.
+  e.g. `oci-utils --format table u co g`
+  e.g. `oci-utils --format table --format-columns id,name u co g`
+* removed `NamedOciEntity`, compartment methods now use `BaseOciDataItem`
+* `SessionItem` now extends `BaseOciEntity`
+* `BaseOciDataItem` requires generic param T extend `BaseOciEntity`
+* add `oci-utils u ci list` - for listing custom images
+* the child processes are now read as they run,
+  because custom images requires client side pagination
+  and therefore reading large responses.
+* child processes have a timeout of 15 seconds until TERM, then 5 to KILL
+* add `@Dto` to model classes with centralized jackson annotations

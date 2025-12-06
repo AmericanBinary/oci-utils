@@ -10,7 +10,9 @@ import lombok.extern.slf4j.Slf4j;
 import oci_utils.model.*;
 import org.ini4j.Ini;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -18,7 +20,10 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 @Data
 @Slf4j
@@ -57,12 +62,11 @@ public class OciHelpers {
     }
 
     @SneakyThrows
-    public List<NamedOciEntity<CompartmentListItem>> listCompartments() {
+    public BaseOciDataList<CompartmentListItem> listCompartments() {
         // oci iam compartment list --compartment-id ${tenancy_id} --name ${compartment} | jq -r .data[].id
         var result = run("oci iam compartment list --compartment-id " + getOrLoadDefaultProfile().getTenancy());
-        var compartments = mapper.readValue(result.output(), new TypeReference<BaseOciDataList<CompartmentListItem>>() {
+        return mapper.readValue(result.output(), new TypeReference<>() {
         });
-        return compartments.getData().stream().map(e -> new NamedOciEntity<CompartmentListItem>().setEntity(e)).toList();
     }
 
     @SneakyThrows
@@ -72,6 +76,14 @@ public class OciHelpers {
         var compartments = mapper.readValue(result.output(), new TypeReference<BaseOciDataList<CompartmentListItem>>() {
         });
         return one(compartments);
+    }
+
+    @SneakyThrows
+    public TenancyItem getTenancy() {
+        String tenancy = getOrLoadDefaultProfile().getTenancy();
+        var result = run("oci iam tenancy get --tenancy-id " + tenancy);
+        return mapper.readValue(result.output(), new TypeReference<BaseOciDataItem<TenancyItem>>() {
+        }).getData();
     }
 
     @SneakyThrows
@@ -253,6 +265,52 @@ public class OciHelpers {
         run("kubectl config set-cluster " + clusterConfigId + " --server https://127.0.0.1:6443");
     }
 
+    /**
+     * <p>
+     * this api filters on the client side
+     * </p><p>
+     * here is the doc saying so: <a href="https://docs.oracle.com/en-us/iaas/api/#/en/iaas/20160918/Image/ListImages">
+     * https://docs.oracle.com/en-us/iaas/api/#/en/iaas/20160918/Image/ListImages
+     * </a>
+     * </p><p>
+     * here is the frontend code from <a href="https://cloud.oracle.com/compute/images">the oci portal</a> that does this:
+     * <pre>
+     *     function getCustomImages($data, namespace = common_1.ApiNamespace.CustomImages) {
+     *         const ListCustomImagesDestination = `CoreServicesApi_ListImages${namespace ?? ""}`;
+     *         const imagesDataSource = $data?.[ListCustomImagesDestination];
+     *         const filteredImages = (imagesDataSource?.response?.data || [])?.filter((img) => img.compartmentId !== null && img.lifecycleState === "AVAILABLE" /* ImageLifecycleState.Available *\/);
+     *         return {
+     *             loading: imagesDataSource?.loading,
+     *             error: imagesDataSource?.error,
+     *             response: {
+     *                 data: filteredImages,
+     *             },
+     *             refreshing: imagesDataSource?.refreshing,
+     *         };
+     *     }
+     * </pre>
+     * </p><p>
+     * Here is the documentation for that frontend page: <a href="https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/custom-images-list.htm">Portal Page docs</a>
+     */
+    @SneakyThrows
+    public BaseOciDataList<ComputeImageItem> listCustomImagesInCompartment(String compartmentId) {
+        var customImages = new BaseOciDataList<ComputeImageItem>().setData(new ArrayList<>());
+
+        var result = run("oci compute image list --compartment-id " + compartmentId);
+        BaseOciDataList<ComputeImageItem> page = mapper.readValue(result.output(), new TypeReference<>() {
+        });
+        customImages.getData().addAll(page.getData().stream().filter(e -> e.getCompartmentId() != null).toList());
+
+        while (page.getNextPage() != null) {
+            var nextPage = run("oci compute image list --compartment-id " + compartmentId + " --page " + page.getNextPage());
+            page = mapper.readValue(nextPage.output(), new TypeReference<>() {
+            });
+            customImages.getData().addAll(page.getData().stream().filter(e -> e.getCompartmentId() != null).toList());
+        }
+
+        return customImages;
+    }
+
     <T> List<T> listFromIterator(Iterator<T> iterator) {
         var t = new ArrayList<T>();
         iterator.forEachRemaining(t::add);
@@ -263,10 +321,29 @@ public class OciHelpers {
     RunResult run(String command) {
         log.trace("running command {}", command);
         var pb = new ProcessBuilder(command.split("\\s+"));
+        var p0 = System.nanoTime();
         var p = pb.start();
+
+        // read as we go
+        var r = new ProcessReader(p);
+        try (var ignored = r) {
+            // timeout the process
+            if (!p.waitFor(15, TimeUnit.SECONDS)) {
+                log.debug("command {} timed out - destroying", command);
+                p.destroy();
+                if (!p.waitFor(5, TimeUnit.SECONDS)) {
+                    log.debug("command {} timed out - destroying forcibly", command);
+                    p.destroyForcibly();
+                    if (!p.waitFor(5, TimeUnit.SECONDS)) {
+                        throw new TimeoutException("process timed out and could not be killed");
+                    }
+                }
+            }
+        }
         var exit = p.waitFor();
-        var dataInput = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        var dataError = new String(p.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
+        log.debug("command {} exited with code {} in {}", command, exit, Duration.ofNanos(System.nanoTime() - p0));
+        var dataInput = r.getInput().toString(StandardCharsets.UTF_8);
+        var dataError = r.getError().toString(StandardCharsets.UTF_8);
         RunResult runResult = new RunResult(dataInput, dataError, exit);
         log.trace("running command {} resulted in {}", command, runResult);
         if (exit != 0) {
@@ -305,6 +382,40 @@ public class OciHelpers {
         @Override
         public String getMessage() {
             return "Expected one item but found these instead: " + String.join(", ", names);
+        }
+    }
+
+    private static class ProcessReader implements AutoCloseable {
+        private final ExecutorService exec;
+
+        @Getter
+        private final ByteArrayOutputStream input = new ByteArrayOutputStream();
+        @Getter
+        private final ByteArrayOutputStream error = new ByteArrayOutputStream();
+
+        ProcessReader(Process p) {
+            this.exec = Executors.newVirtualThreadPerTaskExecutor();
+
+            exec.submit(() -> {
+                try (var in = p.getInputStream()) {
+                    in.transferTo(input);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+
+            exec.submit(() -> {
+                try (var in = p.getErrorStream()) {
+                    in.transferTo(error);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        }
+
+        @Override
+        public void close() {
+            exec.close();
         }
     }
 }
