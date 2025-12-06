@@ -39,7 +39,7 @@ jobs:
 
   publish:
     needs: [ build ]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master' # when merged
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && !contains(needs.build.outputs.BUILD_VERSION, 'SNAPSHOT') # when merged
     runs-on: ubuntu-latest
     steps:
       # download
