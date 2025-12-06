@@ -51,3 +51,7 @@
   and therefore reading large responses.
 * child processes have a timeout of 15 seconds until TERM, then 5 to KILL
 * add `@Dto` to model classes with centralized jackson annotations
+
+## `0.0.9` - `2025-12-06T05:59:38-05:00`
+
+* release new version to fix ci errors
