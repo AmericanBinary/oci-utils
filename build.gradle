@@ -132,6 +132,7 @@ tasks.register('executableJarToCommand', Copy) {
     rename '.*', 'oci-utils'
 }
 
+if (findProperty('directoryInPath'))
 tasks.register('executableJarInstall', Copy) {
     group = 'install'
     description = 'install executable jar'

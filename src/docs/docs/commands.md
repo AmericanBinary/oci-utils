@@ -44,30 +44,43 @@ The same is true of omitting the cluster name - there should be only one in the 
 
 ```console
 $ oci-utils bastion-utils forward-kubectl
-Missing required option: '--compartment=<arg0>'
-Usage: oci-utils bastion-utils forward-kubectl [-hV] [-b=<arg1>] -c=<arg0>
-       [-k=<arg2>]
+Missing required option: '--compartment=<compartment>'
+Usage: oci-utils bastion-utils forward-kubectl [-hV] [-b=<bastionName>]
+       -c=<compartment> [-k=<clusterName>] [--local-port=<localPort>]
 
-  -c, --compartment=<arg0>   compartment name
-  -b, --bastion-name=<arg1>  defaults to sole bastion in compartment
-  -k, --cluster-name=<arg2>  defaults to sole cluster in compartment
-  -h, --help                 Show this help message and exit.
-  -V, --version              Print version information and exit.
+  -c, --compartment=<compartment>
+                  compartment name
+  -b, --bastion-name=<bastionName>
+                  defaults to sole bastion in compartment
+      --local-port=<localPort>
+                  defaults to service specific port
+  -k, --cluster-name=<clusterName>
+                  defaults to sole cluster in compartment
+  -h, --help      Show this help message and exit.
+  -V, --version   Print version information and exit.
 ```
 
-## `oci-utils bastion-utils forward-kubectl`
+## `oci-utils bastion-utils forward-mysql`
 
 ```console
-$ oci-utils bastion-utils forward-kubectl 
-Missing required option: '--compartment=<arg0>'
-Usage: oci-utils bastion-utils forward-kubectl [-hV] [-b=<arg1>] -c=<arg0>
-       [-k=<arg2>]
+$ oci-utils bastion-utils forward-mysql 
+Missing required option: '--compartment=<compartment>'
+Usage: oci-utils bastion-utils forward-mysql [-hV] [-b=<bastionName>]
+       -c=<compartment> [-d=<dbName>] [-di=<dbId>] [--local-port=<localPort>]
 
-  -c, --compartment=<arg0>   compartment name
-  -b, --bastion-name=<arg1>  defaults to sole bastion in compartment
-  -k, --cluster-name=<arg2>  defaults to sole cluster in compartment
-  -h, --help                 Show this help message and exit.
-  -V, --version              Print version information and exit.
+  -c, --compartment=<compartment>
+                  compartment name
+  -b, --bastion-name=<bastionName>
+                  defaults to sole bastion in compartment
+      --local-port=<localPort>
+                  defaults to service specific port
+  -d, -m, --database-name, --mysql-database-name=<dbName>
+                  precedence over --database-id, defaults to sole cluster in
+                    compartment
+      -di, --database-id, --mysql-database-id=<dbId>
+
+  -h, --help      Show this help message and exit.
+  -V, --version   Print version information and exit.
 ```
 
 ## `oci-utils kubectl-utils`
@@ -80,7 +93,9 @@ kubectl utilities
   -h, --help      Show this help message and exit.
   -V, --version   Print version information and exit.
 Commands:
-  configure-localhost-context, clc
+  configure-localhost-context, clc  creates a kubectl context corresponding to
+                                      an OKE cluster
+
 ```
 
 ## `oci-utils ku configure-localhost-context`
