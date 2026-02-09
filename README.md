@@ -1,6 +1,8 @@
 # oci-utils
 helpers for working with oci command line tool (https://pypi.org/project/oci-cli/)
 
+docs: [https://americanbinary.github.io/oci-utils/](https://americanbinary.github.io/oci-utils/)
+
 ### single binary installation:
 
 ```shell
