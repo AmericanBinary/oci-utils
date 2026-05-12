@@ -1,7 +1,9 @@
 package oci_utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import lombok.Data;
 import lombok.SneakyThrows;
+import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
 import oci_utils.model.BastionListItem;
 import oci_utils.model.MysqlClusterListItem;
@@ -15,6 +17,7 @@ import java.io.File;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 @Slf4j
 @CommandLine.Command(
@@ -43,6 +46,13 @@ class OciHelpersCli {
     @CommandLine.Mixin
     LogbackVerbosityMixin verbosityMixin;
 
+    public static void main(String[] args) {
+        LogbackVerbosityMixin.setConsoleAppenderOutputStreamToSystemErr();
+        System.exit(new CommandLine(new OciHelpersCli())
+                .setCaseInsensitiveEnumValuesAllowed(true)
+                .execute(args));
+    }
+
     @CommandLine.Option(names = {"--format", "--output", "--output-format"}, defaultValue = "JSON")
     void setOutputFormat(DataStringFormatter.Format format) {
         outputFormat = format;
@@ -55,13 +65,6 @@ class OciHelpersCli {
         if (columns.size() == 1 && columns.getFirst().contains(","))
             columns = Arrays.asList(columns.getFirst().split(","));
         tableColumns = columns;
-    }
-
-    public static void main(String[] args) {
-        LogbackVerbosityMixin.setConsoleAppenderOutputStreamToSystemErr();
-        System.exit(new CommandLine(new OciHelpersCli())
-                .setCaseInsensitiveEnumValuesAllowed(true)
-                .execute(args));
     }
 
     @CommandLine.Command(name = "util", aliases = "u", description = "general utilities", subcommands = {
@@ -182,14 +185,13 @@ class OciHelpersCli {
         @CommandLine.Command(name = "forward-kubectl")
         @SneakyThrows
         void forwardKubectlPort(
-                @CommandLine.Option(names = {"-c", "--compartment"}, required = true, description = "compartment name")
-                String compartment,
-                @CommandLine.Option(names = {"-b", "--bastion-name"}, description = "defaults to sole bastion in compartment")
-                String bastionName,
+                @CommandLine.Mixin PortForwardOptions portForwardOptions,
                 @CommandLine.Option(names = {"-k", "--cluster-name"}, description = "defaults to sole cluster in compartment")
                 String clusterName
         ) {
+            var compartment = portForwardOptions.getCompartment();
             var c = INSTANCE.getCompartment(compartment);
+            var bastionName = portForwardOptions.getBastionName();
             BastionListItem bastion;
             bastion = bastionName != null ? (
                     INSTANCE.getBastionInCompartment(c.getId(), bastionName)
@@ -205,7 +207,7 @@ class OciHelpersCli {
 
             String privateEndpoint = cluster.getEndpoints().getPrivateEndpoint();
             Assert.notNull(privateEndpoint, "Must have private endpoint on cluster to forward to private endpoint");
-            var pf = generateForwardForEndpoint(privateEndpoint);
+            var pf = generateForwardForEndpoint(privateEndpoint, portForwardOptions.getLocalPort());
 
             var session = INSTANCE.getAndWaitForSession(bastion, HOME_SSH_ID_RSA_PUB, pf);
             printSession(session, pf);
@@ -214,26 +216,25 @@ class OciHelpersCli {
             sessionProcess.waitFor();
         }
 
-        OciHelpers.LocalPortForward generateForwardForEndpoint(String privateEndpoint) {
+        OciHelpers.LocalPortForward generateForwardForEndpoint(String privateEndpoint, Integer localPort) {
             var host = privateEndpoint.split(":")[0];
             var port = Integer.parseInt(privateEndpoint.split(":")[1]);
-            return new OciHelpers.LocalPortForward(port, host, port);
+            return new OciHelpers.LocalPortForward(Objects.requireNonNullElse(localPort, port), host, port);
         }
 
         @CommandLine.Command(name = "forward-mysql")
         @SneakyThrows
         void forwardMysqlPort(
-                @CommandLine.Option(names = {"-c", "--compartment"}, required = true, description = "compartment name")
-                String compartment,
-                @CommandLine.Option(names = {"-b", "--bastion-name"}, description = "defaults to sole bastion in compartment")
-                String bastionName,
+                @CommandLine.Mixin PortForwardOptions portForwardOptions,
                 @CommandLine.Option(names = {"-d", "-m", "--database-name", "--mysql-database-name"},
                         description = "precedence over --database-id, defaults to sole cluster in compartment")
                 String dbName,
                 @CommandLine.Option(names = {"-di", "--database-id", "--mysql-database-id"})
                 String dbId
         ) {
+            var compartment = portForwardOptions.getCompartment();
             var c = INSTANCE.getCompartment(compartment);
+            var bastionName = portForwardOptions.getBastionName();
             BastionListItem bastion;
             bastion = bastionName != null ? (
                     INSTANCE.getBastionInCompartment(c.getId(), bastionName)
@@ -254,7 +255,7 @@ class OciHelpersCli {
             );
 
             var pf = new OciHelpers.LocalPortForward(
-                    cluster.getEndpoints().getFirst().getPort(),
+                    Objects.requireNonNullElse(portForwardOptions.getLocalPort(), cluster.getEndpoints().getFirst().getPort()),
                     cluster.getEndpoints().getFirst().getIpAddress(),
                     cluster.getEndpoints().getFirst().getPort()
             );
@@ -276,6 +277,17 @@ class OciHelpersCli {
 
         private void printSessionProcess(OciHelpers.LocalPortForward pf) {
             System.err.println("Forwarding local connections to localhost on port " + pf.localPort() + " to remote host " + pf.remoteHost() + " on port " + pf.remotePort());
+        }
+
+        @Data
+        @Accessors(chain = true)
+        static class PortForwardOptions {
+            @CommandLine.Option(names = {"-c", "--compartment"}, required = true, description = "compartment name")
+            String compartment;
+            @CommandLine.Option(names = {"-b", "--bastion-name"}, description = "defaults to sole bastion in compartment")
+            String bastionName;
+            @CommandLine.Option(names = {"--local-port"}, description = "defaults to service specific port")
+            Integer localPort;
         }
     }
 
