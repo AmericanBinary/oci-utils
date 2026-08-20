@@ -16,10 +16,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -220,6 +217,11 @@ public class OciHelpers {
 
     @SneakyThrows
     public void configureLocalhostContext(OkeClusterListItem cluster, File file) {
+        configureLocalhostContext(cluster, file, null);
+    }
+
+    @SneakyThrows
+    public void configureLocalhostContext(OkeClusterListItem cluster, File file, Integer localPort) {
         // oci ce cluster create-kubeconfig --cluster-id ${cluster_id} --file ~/.kube/config --region us-sanjose-1 --token-version 2.0.0  --kube-endpoint PRIVATE_ENDPOINT
         // kubectl config rename-context $(kubectl config current-context) ${cluster_name}
         // cluster_config_id=$(kubectl config view -o json | jq '.contexts[] | { name, cluster: .context.cluster} | select(.name == "'${cluster_name}'") | .cluster' -r)
@@ -262,7 +264,7 @@ public class OciHelpers {
                 .map(e -> e.get("cluster").asText())
                 .findAny().orElseThrow();
 
-        run("kubectl config set-cluster " + clusterConfigId + " --server https://127.0.0.1:6443");
+        run("kubectl config set-cluster " + clusterConfigId + " --server https://127.0.0.1:" + Objects.requireNonNullElse(localPort, 6443));
     }
 
     /**
