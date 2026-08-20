@@ -35,9 +35,9 @@ configurations {
 }
 
 dependencies {
-    annotationProcessor platform('org.springframework.boot:spring-boot-dependencies:3.5.8')
-    implementation platform('org.springframework.boot:spring-boot-dependencies:3.5.8')
-    implementation platform('org.springframework.cloud:spring-cloud-dependencies:2025.0.0')
+    annotationProcessor platform('org.springframework.boot:spring-boot-dependencies:3.5.16')
+    implementation platform('org.springframework.boot:spring-boot-dependencies:3.5.16')
+    implementation platform('org.springframework.cloud:spring-cloud-dependencies:2025.0.3')
 
     annotationProcessor 'org.projectlombok:lombok'
     compileOnly 'org.projectlombok:lombok'
@@ -68,7 +68,7 @@ tasks.withType(Test).configureEach { useJUnitPlatform() }
 // mockito boilerplate
 configurations { mockitoAgent {} }
 dependencies {
-    mockitoAgent platform('org.springframework.boot:spring-boot-dependencies:3.5.8')
+    mockitoAgent platform('org.springframework.boot:spring-boot-dependencies:3.5.16')
     mockitoAgent("org.mockito:mockito-core") { transitive = false }
 }
 tasks.withType(Test).configureEach { jvmArgs('-Xshare:off', "-javaagent:${configurations.mockitoAgent.asPath}") }
