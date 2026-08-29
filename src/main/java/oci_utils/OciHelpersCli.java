@@ -298,6 +298,8 @@ class OciHelpersCli {
         void configureLocalhostContext(
                 @CommandLine.Option(names = {"-c", "--compartment"}, required = true, description = "compartment name") String compartment,
                 @CommandLine.Option(names = {"-k", "--cluster-name"}, description = "precedence over --cluster-id, defaults to sole cluster in compartment") String clusterName,
+                @CommandLine.Option(names = {"--local-port"}, description = "defaults to service specific port")
+                Integer localPort,
                 @CommandLine.Option(names = {"-ki", "--cluster-id"}) String clusterId,
                 @CommandLine.Option(names = {"-f", "--config-file"}, description = "defaults to $${KUBECONFIG:-~/.kube/config}") File file
         ) {
@@ -313,7 +315,7 @@ class OciHelpersCli {
                 );
             }
 
-            INSTANCE.configureLocalhostContext(cluster, file);
+            INSTANCE.configureLocalhostContext(cluster, file, localPort);
             log.info("created context {} (for cluster id '{}')", cluster.getName(), cluster.getId());
         }
     }
