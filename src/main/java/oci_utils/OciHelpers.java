@@ -90,13 +90,17 @@ public class OciHelpers {
         });
     }
 
-    @SneakyThrows
     public BastionListItem getBastionInCompartment(String compartmentId, String name) {
+        return getBastionInCompartment(compartmentId, name, BastionLifeCycleState.ACTIVE);
+    }
+
+    @SneakyThrows
+    public BastionListItem getBastionInCompartment(String compartmentId, String name, BastionLifeCycleState state) {
         if (name == null) {
             return one(listBastionInCompartment(compartmentId));
         }
 
-        var result = run("oci bastion bastion list --compartment-id " + compartmentId + " --name " + name);
+        var result = run("oci bastion bastion list --compartment-id " + compartmentId + " --name " + name + " --lifecycle-state " + state);
         // noinspection Convert2Diamond
         return one(mapper.readValue(result.output(), new TypeReference<BaseOciDataList<BastionListItem>>() {
         }));
@@ -108,15 +112,19 @@ public class OciHelpers {
         });
     }
 
+    public OkeClusterListItem getOkeClusterInCompartment(String compartmentId, String name) {
+        return getOkeClusterInCompartment(compartmentId, name, OkeClusterState.ACTIVE);
+    }
+
     // cluster_info="$(oci ce cluster list --compartment-id ${compartment_id} --name ${cluster_name} | jq -c .)"
     @SneakyThrows
-    public OkeClusterListItem getOkeClusterInCompartment(String compartmentId, String name) {
+    public OkeClusterListItem getOkeClusterInCompartment(String compartmentId, String name, OkeClusterState state) {
         if (name == null) {
             return one(listOkeClusterInCompartment(compartmentId));
         }
 
         // noinspection Convert2Diamond
-        return one(mapper.readValue(run("oci ce cluster list --compartment-id " + compartmentId + " --name " + name).output(), new TypeReference<BaseOciDataList<OkeClusterListItem>>() {
+        return one(mapper.readValue(run("oci ce cluster list --compartment-id " + compartmentId + " --name " + name + " --lifecycle-state " + state).output(), new TypeReference<BaseOciDataList<OkeClusterListItem>>() {
         }));
     }
 
@@ -188,13 +196,17 @@ public class OciHelpers {
         });
     }
 
-    @SneakyThrows
     public MysqlClusterListItem getMysqlInCompartment(String compartmentId, String name) {
+        return getMysqlInCompartment(compartmentId, name, DbLifeCycleState.ACTIVE);
+    }
+
+    @SneakyThrows
+    public MysqlClusterListItem getMysqlInCompartment(String compartmentId, String name, DbLifeCycleState state) {
         if (name == null) {
             return one(listMysqlInCompartment(compartmentId));
         }
 
-        var result = run("oci mysql db-system list --compartment-id " + compartmentId + " --display-name " + name);
+        var result = run("oci mysql db-system list --compartment-id " + compartmentId + " --display-name " + name + " --lifecycle-state " + state);
         // noinspection Convert2Diamond
         return one(mapper.readValue(result.output(), new TypeReference<BaseOciDataList<MysqlClusterListItem>>() {
         }));
@@ -360,6 +372,21 @@ public class OciHelpers {
             throw new MultipleResultError(names);
         }
         return list.getData().getFirst();
+    }
+
+    // oci mysql db-system list --help 2>&1 | grep -- -state
+    public enum DbLifeCycleState {
+        CREATING, ACTIVE, INACTIVE, UPDATING, DELETING, DELETED, FAILED
+    }
+
+    // oci bastion bastion list --help 2>&1 | grep -- -state
+    public enum BastionLifeCycleState {
+        CREATING, UPDATING, ACTIVE, DELETING, DELETED, FAILED
+    }
+
+    // oci ce cluster list --help 2>71 | grep -- -state
+    public enum OkeClusterState {
+        CREATING, ACTIVE, FAILED, DELETING, DELETED, UPDATING
     }
 
     public record LocalPortForward(int localPort, String remoteHost, int remotePort) {
