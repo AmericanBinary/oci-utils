@@ -106,9 +106,13 @@ public class OciHelpers {
         }));
     }
 
-    @SneakyThrows
     public BaseOciDataList<OkeClusterListItem> listOkeClusterInCompartment(String compartmentId) {
-        return mapper.readValue(run("oci ce cluster list --compartment-id " + compartmentId).output(), new TypeReference<>() {
+        return listOkeClusterInCompartment(compartmentId, OkeClusterState.ACTIVE);
+    }
+
+    @SneakyThrows
+    public BaseOciDataList<OkeClusterListItem> listOkeClusterInCompartment(String compartmentId, OkeClusterState state) {
+        return mapper.readValue(run("oci ce cluster list --compartment-id " + compartmentId + " --lifecycle-state " + state).output(), new TypeReference<>() {
         });
     }
 
